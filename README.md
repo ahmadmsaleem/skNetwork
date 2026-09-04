@@ -65,6 +65,16 @@ The two halves use different names on purpose. A proxy handles any command it kn
 before the game server sees it, so keeping `/sknet` free means it always reaches the
 server you are standing on, where being an operator is already enough.
 
+## Building & Testing
+
+Java 25 and nothing else. The wrapper fetches Gradle itself.
+
+```
+./gradlew test
+
+./gradlew build             
+```
+
 ---
 
 Setup, config and the full syntax reference are in the

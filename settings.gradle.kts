@@ -1,6 +1,6 @@
 rootProject.name = "skNetwork"
 
-include("common", "proxy", "spigot")
+include("common", "proxy", "spigot", "test")
 
 dependencyResolutionManagement {
     repositories {
