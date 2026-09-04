@@ -77,5 +77,21 @@ Java 25 and nothing else. The wrapper fetches Gradle itself.
 
 ---
 
+skNetwork uses Bstats for anonymous usage stats. You can opt out in `plugins/bStats/config.yml`.
+
+### Bukkit / Spigot / Paper
+
+[![bStats - Bukkit / Spigot](https://bstats.org/signatures/bukkit/skNetwork.svg)](https://bstats.org/plugin/bukkit/skNetwork/33851)
+
+
+### BungeeCord
+
+[![bStats](https://bstats.org/signatures/bungeecord/skNetwork.svg)](https://bstats.org/plugin/bungeecord/skNetwork/33852)
+
+### Velocity
+
+[![bStats](https://bstats.org/signatures/velocity/skNetwork.svg)](https://bstats.org/plugin/velocity/skNetwork/33853)
+
+
 Setup, config and the full syntax reference are in the
 [wiki](https://github.com/ahmadmsaleem/skNetwork/wiki).
