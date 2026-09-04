@@ -11,6 +11,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.BindException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +47,6 @@ class NetworkServerTest {
 	@BeforeEach
 	void setUp() throws IOException {
 		log = new RecordingLog();
-		port = freePort();
 		server = start(null, 10_000);
 	}
 
@@ -625,10 +626,22 @@ class NetworkServerTest {
 	}
 
 	private NetworkServer start(File logFile, int replayCapacity) throws IOException {
-		NetworkServer started = new NetworkServer("127.0.0.1", port, TOKEN, logFile, 10, 2.0,
-				replayCapacity, log);
-		started.start();
-		return started;
+		BindException lost = null;
+
+		for (int attempt = 0; attempt < 20; attempt++) {
+			int candidate = freePort();
+			NetworkServer started = new NetworkServer("127.0.0.1", candidate, TOKEN, logFile, 10, 2.0,
+					replayCapacity, log);
+			try {
+				started.start();
+				port = candidate;
+				return started;
+			} catch (BindException taken) {
+				lost = taken;
+				started.stop();
+			}
+		}
+		throw lost;
 	}
 
 	private FakeBackend connected(String name) throws IOException {
@@ -678,8 +691,10 @@ class NetworkServerTest {
 	}
 
 	private static int freePort() throws IOException {
-		try (ServerSocket probe = new ServerSocket(0)) {
+		ServerSocket probe = new ServerSocket();
+		try (probe) {
 			probe.setReuseAddress(true);
+			probe.bind(new InetSocketAddress("127.0.0.1", 0));
 			return probe.getLocalPort();
 		}
 	}
