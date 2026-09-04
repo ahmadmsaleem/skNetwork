@@ -1,0 +1,47 @@
+# skNetwork, backend half.
+# Reads come from this server's in-memory mirror. Only writes cross the wire.
+
+# How this server identifies itself to the proxy. Blank means "server-<port>".
+server-name: ""
+
+proxy:
+  host: 127.0.0.1
+  port: 25580
+  token: "change-me"
+
+# Which variables are network variables. Skript decides the actual routing from
+# the 'pattern' in its own config.sk, so this must match it. It is used here for
+# stripping the prefix and for error messages.
+prefix: "?"
+
+# Whether skNetwork writes its own database block into plugins/Skript/config.sk
+# on startup, so nobody has to edit that file by hand.
+#
+# It goes above the catch-all database. Skript saves a variable to the first
+# database whose pattern matches and nowhere else, so below it every network
+# variable would also land in variables.csv.
+#
+# Your original is kept as config.sk.pre-skNetwork.bak, and an existing skNetwork
+# block is left alone, so editing it afterwards works fine.
+#
+# Set this to false to manage that block yourself.
+force-skript-config: true
+
+# Until the first sync lands, every 'is not set' check would be answered from an
+# empty mirror, so writes are refused rather than quietly applied to a stale one.
+# Guard them with 'network is synced' or 'on network sync'.
+
+# 'atomically ... and wait' parks the trigger until the proxy answers. If it never
+# does, the change is reported as refused after this long and the script carries on.
+atomic-timeout: 5s
+
+# Send a readable copy of each value alongside the bytes, so /sknet dump on the
+# proxy can print it. The proxy holds serialised bytes and has no Skript, so
+# without this it can only show how many bytes a variable is.
+#
+# It costs one deserialise per outbound write on Skript's own write thread, and a
+# few bytes on the wire. Values over 64kB are sent without one either way. Turn it
+# off if this server writes constantly and nobody uses the proxy console.
+display-values: true
+
+debug: false

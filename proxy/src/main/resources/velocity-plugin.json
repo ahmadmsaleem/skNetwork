@@ -1,0 +1,9 @@
+{
+  "id": "sknetwork",
+  "name": "skNetwork",
+  "version": "${version}",
+  "description": "Shares Skript variables and scripts between every server on the network.",
+  "authors": ["eult"],
+  "dependencies": [],
+  "main": "sknetwork.proxy.SkNetworkVelocity"
+}

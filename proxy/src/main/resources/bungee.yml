@@ -1,0 +1,5 @@
+name: skNetwork
+main: sknetwork.proxy.SkNetworkBungee
+version: ${version}
+author: eult
+description: Shares Skript variables and scripts between every server on the network.

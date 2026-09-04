@@ -1,0 +1,21 @@
+name: skNetwork
+main: sknetwork.spigot.SkNetworkSpigot
+version: ${version}
+api-version: '1.21'
+author: eult
+description: Shares your Skript variables and scripts with the rest of the network.
+
+# Not softdepend. Without Skript this half has nothing to hook into, and the
+# storage has to be registered in onLoad, before Skript enables.
+depend: [Skript]
+
+commands:
+    sknet:
+        description: skNetwork status.
+        usage: /sknet [status|resync|reconnect]
+        permission: sknetwork.admin
+
+permissions:
+    sknetwork.admin:
+        default: op
+        description: Allows use of /sknet.

@@ -1,0 +1,49 @@
+# skNetwork, proxy half.
+# This is the server that owns the data. Every backend mirrors what it holds.
+
+# Loopback by default. Without the token, anyone who can reach this port can read
+# and write every network variable you have.
+bind: 127.0.0.1
+port: 25580
+token: "change-me"
+
+# Append-only change log, in the same CSV shape as Skript's variables.csv.
+# Set to "none" to keep nothing, in which case a proxy restart starts empty.
+log: network.csv
+
+# Buffer flush window. A hard crash loses at most this much.
+flush-interval: 100ms
+
+# Compact once the log holds more than this multiple of the live key count.
+compact-when: 2.0
+
+# How many recent changes to keep for reconnecting servers. A backend away longer
+# than this gets a full snapshot instead, which is slower but always correct.
+replay-buffer: 10000
+
+# ─── Script distribution ──────────────────────────────────────────────────────
+# Scripts in plugins/skNetwork/scripts/<group>/ are pushed to backend servers,
+# which receive them in plugins/Skript/scripts/network/<group>/.
+#
+# 'global' always means every connected server and cannot be redefined. Any other
+# folder name has to appear under 'groups' below or nothing in it is pushed.
+#
+# An entry ending in '/' names another group rather than a server, so one file
+# can reach two sets without being duplicated.
+#
+# Push with /sknet push on the proxy console.
+#
+# Anyone who can write to the scripts folder can run code on every backend.
+scripts:
+  enabled: false
+  groups:
+    hubs:
+      - lobby
+      - lobby2
+    minigames:
+      - bedwars1
+      - bedwars2
+  max-file-kb: 512
+  max-total-mb: 16
+
+debug: false
