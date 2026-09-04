@@ -30,17 +30,42 @@ server's own copy, so only writes go over the wire.
 - **Survives restarts.** Append-only log, self-compacting, reconnects resume.
 - **BungeeCord and Velocity.** Same jar, same config.
 
+## Requirements
+
+| | Works with | Recommended |
+|---|---|---|
+| Java | **25** | 25 |
+| Minecraft | 1.21 to 26.2 | 26.1.2 |
+| Skript | 2.14.0+ | 2.16.2 |
+| Proxy | BungeeCord or Velocity | either |
+
+**Java 25 is required.** The jar will not load on Java 21 or older, whatever Minecraft
+version you run. Both rules apply together: a 1.21 server also has to be started with
+Java 25.
+
+Works on cracked servers. skNetwork never looks at player identity, and it was tested
+with `online-mode=false` against a live network.
+
+Tested on Minecraft 1.21.11 and 26.1.2, Skript 2.14.3, 2.15.3 and 2.16.2,
+BungeeCord 26.1 and Velocity 4.1.1.
+
 ## Commands
 
 ```
-/sknet                 state, proxy, copy size, latency
-/sknet resync          pull the whole map again
-/sknet reconnect       drop the connection and resume
+/sknet                      state, proxy, copy size, latency
+/sknet resync               pull the whole map again
+/sknet reconnect            drop the connection and resume
 
-/sknet push            proxy: send scripts now
-/sknet dump <pattern>  proxy: look up variables, '*' is a wildcard
+/sknetproxy                 proxy: state, backends, variable count
+/sknetproxy push            proxy: send scripts now
+/sknetproxy dump <pattern>  proxy: look up variables, '*' is a wildcard
 ```
+
+The two halves use different names on purpose. A proxy handles any command it knows
+before the game server sees it, so keeping `/sknet` free means it always reaches the
+server you are standing on, where being an operator is already enough.
 
 ---
 
-Setup, config and the full syntax reference are going in the wiki.
+Setup, config and the full syntax reference are in the
+[wiki](https://github.com/ahmadmsaleem/skNetwork/wiki).

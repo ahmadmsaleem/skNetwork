@@ -19,6 +19,7 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
 import org.bstats.velocity.Metrics;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.slf4j.Logger;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.serialize.SerializationException;
@@ -40,6 +41,10 @@ import sknetwork.proxy.core.SknetConsole;
  * command.
  */
 public final class SkNetworkVelocity {
+
+	/** Velocity speaks Adventure, so the shared legacy strings are converted here. */
+	private static final LegacyComponentSerializer LEGACY =
+			LegacyComponentSerializer.builder().character('\u00a7').hexColors().build();
 
 
 	private final ProxyServer proxy;
@@ -82,7 +87,8 @@ public final class SkNetworkVelocity {
 		startMetrics();
 
 		CommandManager commands = proxy.getCommandManager();
-		commands.register(commands.metaBuilder("sknet").plugin(this).build(), new SknetCommand());
+		commands.register(commands.metaBuilder("sknetproxy")
+				.aliases("sknetp", "sknp").plugin(this).build(), new SknetCommand());
 
 		logger.info("{} {} (protocol {}) running as the PROXY half",
 				SkNetwork.NAME, version(), Protocol.VERSION);
@@ -116,7 +122,7 @@ public final class SkNetworkVelocity {
 		@Override
 		public void execute(Invocation invocation) {
 			SknetConsole.run(server, version(), invocation.arguments(),
-					invocation.source()::sendPlainMessage);
+					line -> invocation.source().sendMessage(LEGACY.deserialize(line)));
 		}
 
 		@Override

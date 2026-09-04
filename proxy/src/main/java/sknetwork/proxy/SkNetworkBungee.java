@@ -16,6 +16,7 @@ import org.bstats.charts.SingleLineChart;
 import sknetwork.common.Log;
 import sknetwork.common.Protocol;
 import sknetwork.common.SkNetwork;
+import sknetwork.common.Style;
 import sknetwork.proxy.core.ConfigSource;
 import sknetwork.proxy.core.NetworkServer;
 import sknetwork.proxy.core.ProxyBoot;
@@ -23,6 +24,7 @@ import sknetwork.proxy.core.ProxySettings;
 import sknetwork.proxy.core.SknetConsole;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
 import net.md_5.bungee.api.plugin.Plugin;
 import net.md_5.bungee.config.Configuration;
@@ -83,17 +85,24 @@ public final class SkNetworkBungee extends Plugin {
 		getLogger().info(SkNetwork.NAME + " stopped");
 	}
 
-	/** {@code /sknet} on the proxy console. */
+	/** {@code /sknetproxy} on the proxy console. */
 	private final class SknetCommand extends Command {
 
 		private SknetCommand() {
-			super("sknet", "sknetwork.admin");
+			// not "sknet": a proxy intercepts a command it knows, so that name has to
+			// stay free for the backend half, where an operator already has permission
+			super("sknetproxy", "sknetwork.admin", "sknetp", "sknp");
 		}
 
+		// BungeeCord deprecated its whole chat API in favour of Adventure, which it does
+		// not ship. fromLegacyText stays the only way to colour a line here.
 		@Override
+		@SuppressWarnings("deprecation")
 		public void execute(CommandSender sender, String[] args) {
+			boolean hex = sender instanceof ProxiedPlayer;
 			SknetConsole.run(server, getDescription().getVersion(), args,
-					line -> sender.sendMessage(new TextComponent(line)));
+					line -> sender.sendMessage(TextComponent.fromLegacyText(
+							hex ? line : Style.downgrade(line))));
 		}
 	}
 

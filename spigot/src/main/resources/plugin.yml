@@ -14,6 +14,7 @@ commands:
         description: skNetwork status.
         usage: /sknet [status|resync|reconnect]
         permission: sknetwork.admin
+        aliases: [sknetlocal, sknl]
 
 permissions:
     sknetwork.admin:
