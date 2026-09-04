@@ -58,6 +58,7 @@ Thumbs.db
 desktop.ini
 
 # Editors
+.vscode/
 *.swp
 *.swo
 *~
