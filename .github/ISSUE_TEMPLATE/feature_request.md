@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for skLambda
+about: Suggest an idea for skNetwork
 title: "[Suggestion]"
 labels: enhancement
 assignees: ''

@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report something broken in skLambda
+about: Report something broken in skNetwork
 title: "[BUG]"
 labels: bug
 assignees: ''
