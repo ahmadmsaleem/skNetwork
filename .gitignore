@@ -5,6 +5,7 @@ planing/
 .gradle/
 build/
 */build/
+dist/
 !gradle/wrapper/gradle-wrapper.jar
 gradle-app.setting
 .gradletasknamecache
