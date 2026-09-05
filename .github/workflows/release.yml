@@ -57,28 +57,31 @@ jobs:
             - name: Build the universal jar
               run: ./gradlew universalJar --no-daemon --console=plain
 
-            - name: Name the jar
-              id: jar
-              run: |
-                  JAR=$(ls build/libs/skNetwork-*.jar)
-                  echo "path=$JAR" >> "$GITHUB_OUTPUT"
-                  echo "name=$(basename "$JAR")" >> "$GITHUB_OUTPUT"
+            # Downloads go through Modrinth, so the jar is kept here only long
+            # enough for a maintainer to fetch it and upload it there.
+            - name: Keep the jar for the Modrinth upload
+              uses: actions/upload-artifact@v6
+              with:
+                  name: skNetwork-jar
+                  path: build/libs/skNetwork-*.jar
+                  if-no-files-found: error
+                  retention-days: 30
 
             - name: Publish the release
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ inputs.tag || github.ref_name }}
                   name: skNetwork ${{ inputs.tag || github.ref_name }}
-                  files: ${{ steps.jar.outputs.path }}
                   generate_release_notes: true
                   draft: true
                   prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
                   body: |
-                      One jar for the proxy and every backend.
+                      ## Download
 
-                      Drop `${{ steps.jar.outputs.name }}` into the `plugins/` folder of your
-                      BungeeCord or Velocity proxy and of every backend server, then restart.
-                      Java 25 is required on both halves.
+                      **[Get it on Modrinth](https://modrinth.com/project/sknetwork)**
+
+                      One jar goes on the proxy and on every backend. Java 25 is required
+                      on both halves.
 
                       Setup and the full syntax reference are in the
                       [wiki](https://github.com/ahmadmsaleem/skNetwork/wiki).
