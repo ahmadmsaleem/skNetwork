@@ -1,0 +1,84 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - 'v*'
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: 'Tag to build, for example v0.1.0'
+                required: true
+                type: string
+
+permissions:
+    contents: write
+
+jobs:
+    release:
+        name: Build and publish
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  ref: ${{ inputs.tag || github.ref }}
+                  fetch-depth: 0
+
+            - name: Validate the Gradle wrapper
+              uses: gradle/actions/wrapper-validation@v6
+
+            - name: Set up JDK 25
+              uses: actions/setup-java@v5
+              with:
+                  java-version: '25'
+                  distribution: temurin
+                  cache: gradle
+
+            - name: Grant execute permission for gradlew
+              run: chmod +x gradlew
+
+            - name: Check the tag matches the project version
+              run: |
+                  TAG="${{ inputs.tag || github.ref_name }}"
+                  PROJECT=$(grep -E '^version *= *' gradle.properties | sed 's/.*= *//')
+                  echo "tag $TAG, gradle.properties $PROJECT"
+                  if [ "$TAG" != "v$PROJECT" ]; then
+                      echo "::error::Tag $TAG does not match version $PROJECT in gradle.properties."
+                      exit 1
+                  fi
+                  if echo "$PROJECT" | grep -q SNAPSHOT; then
+                      echo "::error::$PROJECT is a snapshot, so it cannot be released."
+                      exit 1
+                  fi
+
+            - name: Run the tests
+              run: ./gradlew :test:test --no-daemon --console=plain
+
+            - name: Build the universal jar
+              run: ./gradlew universalJar --no-daemon --console=plain
+
+            - name: Name the jar
+              id: jar
+              run: |
+                  JAR=$(ls build/libs/skNetwork-*.jar)
+                  echo "path=$JAR" >> "$GITHUB_OUTPUT"
+                  echo "name=$(basename "$JAR")" >> "$GITHUB_OUTPUT"
+
+            - name: Publish the release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ inputs.tag || github.ref_name }}
+                  name: skNetwork ${{ inputs.tag || github.ref_name }}
+                  files: ${{ steps.jar.outputs.path }}
+                  generate_release_notes: true
+                  draft: true
+                  prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
+                  body: |
+                      One jar for the proxy and every backend.
+
+                      Drop `${{ steps.jar.outputs.name }}` into the `plugins/` folder of your
+                      BungeeCord or Velocity proxy and of every backend server, then restart.
+                      Java 25 is required on both halves.
+
+                      Setup and the full syntax reference are in the
+                      [wiki](https://github.com/ahmadmsaleem/skNetwork/wiki).
