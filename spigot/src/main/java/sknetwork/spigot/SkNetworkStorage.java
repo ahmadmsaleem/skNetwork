@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.variables.VariablesStorage;
+import org.jetbrains.annotations.Nullable;
 import sknetwork.common.MutationMode;
 
 /**
@@ -40,7 +41,8 @@ public final class SkNetworkStorage extends VariablesStorage {
 		SkNetworkStorage storage = instance;
 		if (storage == null)
 			return "<none>";
-		return storage.getNamePattern() == null ? "<unreadable>" : storage.getNamePattern().pattern();
+		Pattern namePattern = storage.getNamePattern();
+		return namePattern == null ? "<unreadable>" : namePattern.pattern();
 	}
 
 	/**
@@ -106,7 +108,7 @@ public final class SkNetworkStorage extends VariablesStorage {
 	 * check and the prefix are dealt with.
 	 */
 	@Override
-	protected boolean save(String name, String type, byte[] value) {
+	protected boolean save(String name, @Nullable String type, byte @Nullable [] value) {
 		SkNetworkSpigot plugin = SkNetworkSpigot.get();
 		if (plugin == null)
 			return true;
