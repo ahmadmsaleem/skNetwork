@@ -23,7 +23,8 @@ import sknetwork.spigot.SkNetworkSpigot;
 		"Which server a player is on, by name, or nothing when nobody on the network is holding "
 				+ "them.",
 		"Use it before moving somebody, so you do not connect them to the server they are already "
-				+ "standing on."
+				+ "standing on.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players"
 })
 @Example("""
 		command /find <text>:

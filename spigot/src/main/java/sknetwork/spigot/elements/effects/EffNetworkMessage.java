@@ -26,7 +26,8 @@ import sknetwork.spigot.SkNetworkSpigot;
 		"Sends a message to a player anywhere on the network, whichever server they are on.",
 		"The message is styled here and rendered there, so colours, hover text and clickable "
 				+ "parts all survive the trip.",
-		"A player nobody is holding is skipped. Nothing is queued for someone offline."
+		"A player nobody is holding is skipped. Nothing is queued for someone offline.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players"
 })
 @Example("send network message \"&aYou were paid 50 coins.\" to network player \"Notch\"")
 @Example("broadcast \"&e%player% just won the event!\" across the network")

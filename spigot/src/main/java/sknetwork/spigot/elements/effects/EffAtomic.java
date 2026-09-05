@@ -39,17 +39,18 @@ import sknetwork.spigot.elements.types.LastAtomic;
 		"Add `and wait` to hold the trigger until the proxy replies, then read the outcome with "
 				+ "`the atomic change succeeded` and `the atomic result`. Everything after it runs on "
 				+ "a later tick, so the usual Skript delay rules apply: you cannot cancel the event "
-				+ "past that point, and it does not belong in a function."
+				+ "past that point, and it does not belong in a function.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes"
 })
 @Example("""
-		atomically add 50 to {?coins::%uuid of player%}
-		atomically remove 50 from {?coins::%uuid of player%}
-		atomically set {?coins::%uuid of player%} to 100 if it is not set
-		atomically set {?rank::%uuid of player%} to "vip" if it is "default"
+		atomically add 50 to {?coins::%player%}
+		atomically remove 50 from {?coins::%player%}
+		atomically set {?coins::%player%} to 100 if it is not set
+		atomically set {?rank::%player%} to "vip" if it is "default"
 		""")
 @Example("""
 		# spending money safely, on any server
-		atomically remove 250 from {?coins::%uuid of player%} without going below 0 and wait
+		atomically remove 250 from {?coins::%player%} without going below 0 and wait
 		if the atomic change succeeded:
 			give player a diamond
 			send "You have %the atomic result% coins left."

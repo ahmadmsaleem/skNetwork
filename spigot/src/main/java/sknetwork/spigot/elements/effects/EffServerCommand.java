@@ -23,7 +23,8 @@ import sknetwork.spigot.SkNetworkSpigot;
 		"Off unless `remote-commands` is turned on in the proxy config. Anyone who can write a "
 				+ "script on one backend would otherwise have console on every backend, so the "
 				+ "proxy refuses and says so in its log.",
-		"Leave the server out to run it everywhere, including here."
+		"Leave the server out to run it everywhere, including here.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players"
 })
 @Example("execute command \"save-all\" on network server \"survival\"")
 @Example("execute command \"whitelist reload\" on the network")

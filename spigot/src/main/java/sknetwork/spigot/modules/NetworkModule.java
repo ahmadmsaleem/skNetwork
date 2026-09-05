@@ -76,7 +76,8 @@ public final class NetworkModule implements AddonModule {
 						"It fires again after every reconnect, so use it to rebuild anything this "
 								+ "server owns while it is running. A crash never fires `on quit`, so a "
 								+ "cross-server player list keeps everyone who was online when the "
-								+ "server died until something clears it.")
+								+ "server died until something clears it.",
+						"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events")
 				.examples(
 						"on network sync:",
 						"\tdelete {?online::%network server name%::*}",
@@ -89,7 +90,8 @@ public final class NetworkModule implements AddonModule {
 				.description(
 						"Fires on this server when it loses the proxy.",
 						"Reads keep working from the copy this server already holds. Writes are "
-								+ "refused until it reconnects.")
+								+ "refused until it reconnects.",
+						"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events")
 				.examples(
 						"on network disconnect:",
 						"\tbroadcast \"Lost the proxy. Balances are read only for now.\"")
@@ -103,8 +105,12 @@ public final class NetworkModule implements AddonModule {
 								+ "the one that wrote it.",
 						"Give it a name to listen to one branch instead of every write on the "
 								+ "network. A `*` is a wildcard, the same as `/sknetproxy dump`.",
+						"That name is the stored key, not a variable name, so a `%player%` written "
+								+ "inside it is never filled in. Match the branch with `*` and read "
+								+ "`the changed variable` to find out who it was.",
 						"Nothing fires while a snapshot is arriving, so a server joining does not "
-								+ "replay the whole map as changes.")
+								+ "replay the whole map as changes.",
+						"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events")
 				.examples(
 						"on network variable change of \"inbox::*\":",
 						"\tset {_uuid} to the second element of the changed variable split at \"::\"",

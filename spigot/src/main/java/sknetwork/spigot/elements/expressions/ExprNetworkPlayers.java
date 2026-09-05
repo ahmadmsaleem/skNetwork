@@ -23,7 +23,8 @@ import sknetwork.spigot.SkNetworkSpigot;
 		"The names of everyone online across the whole network, or on the servers you name.",
 		"This replaces keeping your own list in a variable. The proxy rebuilds it whenever a "
 				+ "server joins or leaves, so a server that crashes takes its players with it "
-				+ "instead of leaving them listed forever."
+				+ "instead of leaving them listed forever.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players"
 })
 @Example("send \"%size of all network players% online\"")
 @Example("send \"On the hubs: %network players on \"lobby\", \"lobby2\"%\"")

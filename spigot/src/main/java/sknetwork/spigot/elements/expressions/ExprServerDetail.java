@@ -20,7 +20,8 @@ import sknetwork.spigot.SkNetworkSpigot;
 @Description({
 		"The message of the day or the Minecraft version a server on the network reports.",
 		"Each server reports its own, so this is what that server actually holds rather than what "
-				+ "the proxy was configured to expect."
+				+ "the proxy was configured to expect.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players"
 })
 @Example("send \"survival runs %version of network server \"survival\"%\"")
 @Since("0.2.0")

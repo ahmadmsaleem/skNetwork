@@ -20,7 +20,8 @@ import sknetwork.spigot.elements.events.NetworkVariableChangeEvent;
 		"Inside `on network variable change`, the name that changed and the values either side of "
 				+ "the change.",
 		"The name carries no prefix, because that is how it travels between servers. A delete "
-				+ "leaves the new value unset."
+				+ "leaves the new value unset.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events"
 })
 @Example("""
 		on network variable change of "coins::*":

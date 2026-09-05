@@ -22,10 +22,11 @@ import sknetwork.spigot.elements.types.LastAtomic;
 				+ "that is the new total.",
 		"The proxy worked this number out itself, so it is right even when the change has not "
 				+ "reached this server's own copy yet.",
-		"Empty when the proxy refused the change, and empty when no reply came back."
+		"Empty when the proxy refused the change, and empty when no reply came back.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes"
 })
 @Example("""
-		atomically add 50 to {?coins::%uuid of player%} and wait
+		atomically add 50 to {?coins::%player%} and wait
 		if the atomic change succeeded:
 			send "You now have %the atomic result% coins."
 		""")

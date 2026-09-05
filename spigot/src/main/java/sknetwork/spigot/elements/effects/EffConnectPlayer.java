@@ -24,7 +24,8 @@ import sknetwork.spigot.SkNetworkSpigot;
 		"This is the one thing the proxy has to do itself, so it is the only syntax here that "
 				+ "stops working when `players` is off in the proxy config.",
 		"Nothing happens if that player is not on the network, or the server name is not one the "
-				+ "proxy knows."
+				+ "proxy knows.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players"
 })
 @Example("connect network player \"%player%\" to \"survival\"")
 @Since("0.2.0")

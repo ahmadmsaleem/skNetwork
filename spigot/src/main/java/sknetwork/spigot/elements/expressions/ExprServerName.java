@@ -21,7 +21,8 @@ import sknetwork.spigot.SkNetworkSpigot;
 		"It is the `server-name` value from this server's skNetwork config, or `server-<port>` when "
 				+ "that is left blank.",
 		"One script can be pushed to every server at once, so this is how a single file can behave "
-				+ "differently depending on where it landed."
+				+ "differently depending on where it landed.",
+		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events"
 })
 @Example("""
 		on join:
