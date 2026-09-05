@@ -54,4 +54,6 @@ Match the file you are editing. Tabs. Comments say why, not what.
 
 For maintainers: set the version in `gradle.properties`, then tag `v<version>` and
 push the tag. The workflow checks the tag against the version, refuses snapshots, runs
-the tests, and opens a draft release with the jar attached.
+the tests, and opens a draft release. Downloads go through
+[Modrinth](https://modrinth.com/project/sknetwork), so collect the jar from the run's
+artifacts and upload it there.
