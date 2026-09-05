@@ -49,6 +49,8 @@ dependencies {
 
 // Paper reads plugin.yml, BungeeCord reads bungee.yml, so each side picks its
 // own main class and never loads the other's classes.
+tasks.named("shadowJar") { enabled = false }
+
 tasks.register<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("universalJar") {
     group = "build"
     description = "Builds the single jar that goes on the proxy and every backend."
@@ -80,7 +82,7 @@ tasks.register<Copy>("deploy") {
             throw GradleException("Test network not found at $testServer")
         }
         val jar = tasks.named<Jar>("universalJar").get().archiveFile.get().asFile
-        listOf("bungeecord", "lobby", "lobby2", "survival").forEach { server ->
+        listOf("bungeecord", "velocity", "lobby", "lobby2", "survival").forEach { server ->
             val plugins = File(testServer, "$server/plugins")
             if (!plugins.isDirectory) return@forEach
             jar.copyTo(File(plugins, jar.name), overwrite = true)
