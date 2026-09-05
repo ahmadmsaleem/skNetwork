@@ -114,6 +114,34 @@ class NetworkServerTest {
 	}
 
 	@Test
+	void carriesThePreviousValueInEveryDelta() throws IOException {
+		FakeBackend lobby = synced("lobby");
+
+		lobby.fireAndForget(MutationMode.SET, "coins", "long", Numbers.writeLong(100));
+		FakeBackend.Delta first = lobby.delta();
+
+		lobby.fireAndForget(MutationMode.SET, "coins", "long", Numbers.writeLong(250));
+		FakeBackend.Delta second = lobby.delta();
+
+		assertNull(first.wasValue());
+		assertEquals(100, Numbers.readLong(second.wasType(), second.wasValue()));
+		assertEquals(250, Numbers.readLong(second.type(), second.value()));
+	}
+
+	@Test
+	void carriesThePreviousValueWhenAKeyIsDeleted() throws IOException {
+		FakeBackend lobby = synced("lobby");
+		lobby.set("coins", "long", Numbers.writeLong(7));
+
+		lobby.fireAndForget(MutationMode.DELETE, "coins", null, null);
+		FakeBackend.Delta delta = lobby.delta();
+
+		assertEquals(MutationMode.DELETE, delta.mode());
+		assertNull(delta.value());
+		assertEquals(7, Numbers.readLong(delta.wasType(), delta.wasValue()));
+	}
+
+	@Test
 	void sendsAWriteToEveryOtherBackend() throws IOException {
 		FakeBackend lobby = synced("lobby");
 		FakeBackend survival = synced("survival");
@@ -438,6 +466,35 @@ class NetworkServerTest {
 	}
 
 	@Test
+	void dropsABackendThatStopsReadingInsteadOfQueueingForever() throws IOException {
+		server.backlogLimit(1024 * 1024);
+		FakeBackend frozen = synced("frozen");
+		FakeBackend lobby = synced("lobby");
+
+		byte[] blob = new byte[200 * 1024];
+		for (int i = 0; i < 100; i++)
+			lobby.set("blob::" + i, "string", blob);
+
+		awaitWarning("not reading what the proxy sends");
+		await(() -> server.connectionCount() == 1, "the frozen backend was never dropped");
+		assertEquals(1, lobby.ping(1));
+		frozen.close();
+	}
+
+	@Test
+	void keepsEverySnapshotFrameUnderTheCapWhenValuesAreLarge() throws IOException {
+		FakeBackend lobby = synced("lobby");
+		// forty values of 300 KB is 12 MB inside one window of 500 entries, past the
+		// 8 MB a frame may carry. each one arrived in its own frame, so the proxy took it
+		byte[] blob = new byte[300 * 1024];
+		for (int i = 0; i < 40; i++)
+			lobby.fireAndForget(MutationMode.SET, "blob::" + i, "string", blob);
+		lobby.deltaAt(40);
+
+		assertEquals(40, connected("survival").sync().snapshot().size());
+	}
+
+	@Test
 	void spreadsALargeSnapshotOverSeveralFrames() throws IOException {
 		FakeBackend lobby = synced("lobby");
 		for (int i = 0; i < 1200; i++)
@@ -622,7 +679,10 @@ class NetworkServerTest {
 
 		lobby.sendRaw(new Frame(Protocol.MUTATE, new byte[] {1, 2}));
 
-		assertThrows(IOException.class, lobby::take);
+		assertThrows(IOException.class, () -> {
+			for (int i = 0; i < 16; i++)
+				lobby.take();
+		});
 	}
 
 	private NetworkServer start(File logFile, int replayCapacity) throws IOException {

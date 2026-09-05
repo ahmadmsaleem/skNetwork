@@ -26,6 +26,16 @@ server's own copy, so only writes go over the wire.
 - **Read the outcome.** `and wait` gives you the new value, or why it was refused.
 - **Server identity.** `network server name`, for one script that runs everywhere.
 - **Sync state.** `network is synced`, `on network sync`, `on network disconnect`.
+- **Change events.** `on network variable change of "coins::*"` fires on every server
+  with the old and the new value.
+- **Who is where.** `all network players`, `network server of "Notch"`,
+  `network server "survival" is online`, plus the motd, version, player limit and
+  whitelist of any server. Read from memory, kept fresh by the proxy.
+- **Messages anywhere.** `send network message` and `send network action bar` to a
+  player on any server, `broadcast ... across the network` to everyone.
+- **Moving players.** `connect network player "%player%" to "survival"`.
+- **Remote console.** `execute command ... on network server "survival"`. Off until
+  the proxy config allows it.
 - **Script sharing.** Push scripts from the proxy, with per-server load results.
 - **Survives restarts.** Append-only log, self-compacting, reconnects resume.
 - **BungeeCord and Velocity.** Same jar, same config.
@@ -36,18 +46,19 @@ server's own copy, so only writes go over the wire.
 |---|---|---|
 | Java | **25** | 25 |
 | Minecraft | 1.21 to 26.2 | 26.1.2 |
-| Skript | 2.14.0+ | 2.16.2 |
+| Skript | 2.16.0+ | 2.16.2 |
 | Proxy | BungeeCord or Velocity | either |
 
 **Java 25 is required.** The jar will not load on Java 21 or older, whatever Minecraft
 version you run. Both rules apply together: a 1.21 server also has to be started with
 Java 25.
 
-Works on cracked servers. skNetwork never looks at player identity, and it was tested
-with `online-mode=false` against a live network.
+Every game server and the proxy run the same jar. One that is behind is refused
+when it connects, with a message on both consoles saying which side to update.
 
-Tested on Minecraft 1.21.11 and 26.1.2, Skript 2.14.3, 2.15.3 and 2.16.2,
-BungeeCord 26.1 and Velocity 4.1.1.
+Works on offline servers. skNetwork never looks at player identity.
+Tested on Minecraft 1.21.11 and 26.1.2, Skript 2.16.2, BungeeCord 26.1 and
+Velocity 4.1.1.
 
 ## Commands
 
@@ -65,19 +76,9 @@ The two halves use different names on purpose. A proxy handles any command it kn
 before the game server sees it, so keeping `/sknet` free means it always reaches the
 server you are standing on, where being an operator is already enough.
 
-## Building & Testing
-
-Java 25 and nothing else. The wrapper fetches Gradle itself.
-
-```
-./gradlew test
-
-./gradlew build             
-```
 
 ---
-
-skNetwork uses Bstats for anonymous usage stats. You can opt out in `plugins/bStats/config.yml`.
+skNetwork uses bStats for anonymous usage stats. You can opt out in `plugins/bStats/config.yml`.
 
 ### Bukkit / Spigot / Paper
 
@@ -86,11 +87,11 @@ skNetwork uses Bstats for anonymous usage stats. You can opt out in `plugins/bSt
 
 ### BungeeCord
 
-[![bStats](https://bstats.org/signatures/bungeecord/skNetwork.svg)](https://bstats.org/plugin/bungeecord/skNetwork/33852)
+[![bStats - BungeeCord](https://bstats.org/signatures/bungeecord/skNetwork.svg)](https://bstats.org/plugin/bungeecord/skNetwork/33852)
 
 ### Velocity
 
-[![bStats](https://bstats.org/signatures/velocity/skNetwork.svg)](https://bstats.org/plugin/velocity/skNetwork/33853)
+[![bStats Velocity](https://bstats.org/signatures/velocity/skNetwork.svg)](https://bstats.org/plugin/velocity/skNetwork/33853)
 
 
 Setup, config and the full syntax reference are in the

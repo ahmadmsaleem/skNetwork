@@ -8,12 +8,26 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.elements.conditions.CondAtomicChange;
 import sknetwork.spigot.elements.conditions.CondNetworkSynced;
+import sknetwork.spigot.elements.conditions.CondServerOnline;
 import sknetwork.spigot.elements.effects.EffAtomic;
+import sknetwork.spigot.elements.effects.EffConnectPlayer;
+import sknetwork.spigot.elements.effects.EffNetworkActionBar;
+import sknetwork.spigot.elements.effects.EffNetworkMessage;
+import sknetwork.spigot.elements.effects.EffServerCommand;
 import sknetwork.spigot.elements.events.NetworkDisconnectEvent;
+import sknetwork.spigot.elements.events.EvtNetworkVariable;
 import sknetwork.spigot.elements.events.NetworkSyncEvent;
+import sknetwork.spigot.elements.events.NetworkVariableChangeEvent;
 import sknetwork.spigot.elements.expressions.ExprAtomicError;
 import sknetwork.spigot.elements.expressions.ExprAtomicResult;
+import sknetwork.spigot.elements.expressions.ExprChangedVariable;
+import sknetwork.spigot.elements.expressions.ExprNetworkPlayers;
+import sknetwork.spigot.elements.expressions.ExprNetworkServers;
+import sknetwork.spigot.elements.expressions.ExprPlayerServer;
+import sknetwork.spigot.elements.expressions.ExprServerDetail;
+import sknetwork.spigot.elements.expressions.ExprServerMaxPlayers;
 import sknetwork.spigot.elements.expressions.ExprServerName;
+import sknetwork.spigot.elements.expressions.ExprServerWhitelist;
 
 /** Everything skNetwork adds to Skript's grammar. */
 public final class NetworkModule implements AddonModule {
@@ -34,6 +48,19 @@ public final class NetworkModule implements AddonModule {
 		ExprServerName.register(registry);
 		ExprAtomicResult.register(registry);
 		ExprAtomicError.register(registry);
+
+		CondServerOnline.register(registry);
+		EffNetworkMessage.register(registry);
+		EffNetworkActionBar.register(registry);
+		EffConnectPlayer.register(registry);
+		EffServerCommand.register(registry);
+		ExprNetworkServers.register(registry);
+		ExprNetworkPlayers.register(registry);
+		ExprPlayerServer.register(registry);
+		ExprServerDetail.register(registry);
+		ExprServerMaxPlayers.register(registry);
+		ExprServerWhitelist.register(registry);
+		ExprChangedVariable.register(registry);
 
 		registerEvents();
 	}
@@ -67,5 +94,22 @@ public final class NetworkModule implements AddonModule {
 						"on network disconnect:",
 						"\tbroadcast \"Lost the proxy. Balances are read only for now.\"")
 				.since("0.0.1");
+
+		Skript.registerEvent("Network Variable Change", EvtNetworkVariable.class,
+						NetworkVariableChangeEvent.class,
+						"network variable change [of %-string%]")
+				.description(
+						"Fires on every server the moment a network variable changes, including "
+								+ "the one that wrote it.",
+						"Give it a name to listen to one branch instead of every write on the "
+								+ "network. A `*` is a wildcard, the same as `/sknetproxy dump`.",
+						"Nothing fires while a snapshot is arriving, so a server joining does not "
+								+ "replay the whole map as changes.")
+				.examples(
+						"on network variable change of \"inbox::*\":",
+						"\tset {_uuid} to the second element of the changed variable split at \"::\"",
+						"\tif player with uuid {_uuid} is online:",
+						"\t\tsend the new value to player with uuid {_uuid}")
+				.since("0.2.0");
 	}
 }

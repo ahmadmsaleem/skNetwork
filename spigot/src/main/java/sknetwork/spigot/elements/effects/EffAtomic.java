@@ -22,6 +22,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.common.MutationMode;
 import sknetwork.spigot.SkNetworkSpigot;
+import sknetwork.spigot.SkriptBridge;
 import sknetwork.spigot.elements.types.AtomicChange;
 import sknetwork.spigot.elements.types.LastAtomic;
 
@@ -183,7 +184,9 @@ public class EffAtomic extends Effect {
 
 	/** @return null when the value cannot be serialised, which is already logged */
 	private @Nullable AtomicChange build(Event event, SkNetworkSpigot plugin) {
-		String local = variable.getName().toString(event);
+		// the name as typed, so it has to be lowercased the way Skript does for a plain set,
+		// or {?coins::%player%} atomically and {?coins::%player%} plainly are two keys
+		String local = SkriptBridge.normalize(variable.getName().toString(event));
 
 		Object single = value.getSingle(event);
 		SerializedVariable.Value amount = single == null ? null : Variables.serialize(single);

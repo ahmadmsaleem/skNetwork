@@ -87,14 +87,17 @@ class VariableStoreTest {
 	}
 
 	@Test
-	void knowsWhetherADeleteWouldChangeAnything() {
+	void saysWhetherADeleteChangedAnything() {
 		store.set("coins::eult", "long", new byte[] {1}, "1", 1);
+		store.set("coins::njol", "long", new byte[] {2}, "2", 2);
 
-		assertTrue(store.matches("coins::eult"));
-		assertTrue(store.matches("coins::*"));
-		assertFalse(store.matches("coins"));
-		assertFalse(store.matches("party::*"));
-		assertFalse(store.matches("missing"));
+		assertFalse(store.delete("coins"));
+		assertFalse(store.delete("party::*"));
+		assertFalse(store.delete("missing"));
+		assertTrue(store.delete("coins::eult"));
+		assertTrue(store.delete("coins::*"));
+		assertFalse(store.delete("coins::*"));
+		assertEquals(0, store.size());
 	}
 
 	@Test

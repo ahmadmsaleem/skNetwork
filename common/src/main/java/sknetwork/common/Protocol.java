@@ -4,7 +4,7 @@ package sknetwork.common;
 public final class Protocol {
 
 	/** Bump this whenever a frame changes shape. Checked during HELLO. */
-	public static final int VERSION = 6;
+	public static final int VERSION = 8;
 
 
 	public static final int DEFAULT_PORT = 25580;
@@ -38,6 +38,20 @@ public final class Protocol {
 	public static final byte FILE = 0x52;
 	/** server -> proxy: what loaded and what did not. */
 	public static final byte LOAD_RESULT = 0x53;
+
+	// Network state
+	/** server -> proxy: this server's own details and who is on it. */
+	public static final byte SERVER_INFO = 0x60;
+	/** proxy -> server: every server on the network, as the proxy sees them. */
+	public static final byte NETWORK_STATE = 0x61;
+
+	// Acting on another server
+	/** server -> proxy: do something to a player wherever they are. */
+	public static final byte PLAYER_ACTION = 0x62;
+	/** proxy -> server: carry out an action for a player on this server. */
+	public static final byte PLAYER_DELIVERY = 0x63;
+	/** server -> proxy -> server: run a command on a console. */
+	public static final byte CONSOLE_COMMAND = 0x64;
 
 	private Protocol() {
 	}

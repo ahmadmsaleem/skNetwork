@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +15,9 @@ import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
+import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
 
 import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
@@ -78,6 +81,7 @@ public final class SkNetworkVelocity {
 
 		try {
 			server = ProxyBoot.start(settings, dataDirectory.toFile(), log);
+			server.actions(this::connect);
 		} catch (IOException e) {
 			logger.error("could not bind {}:{} - {}", settings.bind(), settings.port(), e.getMessage());
 			server = null;
@@ -95,6 +99,17 @@ public final class SkNetworkVelocity {
 	}
 
 	/** Same charts as the BungeeCord half, so the two pages read the same way. */
+	/** Moving a player between servers is the one thing only the proxy can do. */
+	private boolean connect(String player, String target) {
+		Optional<Player> moving = proxy.getPlayer(player);
+		Optional<RegisteredServer> destination = proxy.getServer(target);
+		if (moving.isEmpty() || destination.isEmpty())
+			return false;
+
+		moving.get().createConnectionRequest(destination.get()).fireAndForget();
+		return true;
+	}
+
 	private void startMetrics() {
 		Metrics metrics = metricsFactory.make(this, SkNetwork.BSTATS_VELOCITY);
 		metrics.addCustomChart(new SingleLineChart("backends", server::connectionCount));

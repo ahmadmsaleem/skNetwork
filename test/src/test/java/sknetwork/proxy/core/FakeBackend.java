@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import sknetwork.common.Frame;
 import sknetwork.common.Manifest;
 import sknetwork.common.MutationMode;
+import sknetwork.common.PlayerAction;
+import sknetwork.common.RemoteServer;
 import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
 import sknetwork.common.Protocol;
@@ -85,7 +87,6 @@ final class FakeBackend implements AutoCloseable {
 			switch (frame.opcode) {
 				case Protocol.SNAPSHOT -> {
 					PacketIn packet = frame.reader();
-					packet.bool();
 					int count = packet.varInt();
 					for (int i = 0; i < count; i++) {
 						snapshot.add(packet.string());
@@ -96,7 +97,8 @@ final class FakeBackend implements AutoCloseable {
 				case Protocol.DELTA -> {
 					PacketIn packet = frame.reader();
 					replayed.add(new Delta(packet.int64(), MutationMode.byId((byte) packet.varInt()),
-							packet.string(), packet.nullableString(), packet.nullableBytes()));
+							packet.string(), packet.nullableString(), packet.nullableBytes(),
+							packet.nullableString(), packet.nullableBytes()));
 				}
 				case Protocol.SYNCED -> {
 					PacketIn packet = frame.reader();
@@ -163,9 +165,9 @@ final class FakeBackend implements AutoCloseable {
 	}
 
 	Delta delta() throws IOException {
-		Frame frame = await(Protocol.DELTA);
-		PacketIn packet = frame.reader();
+		PacketIn packet = await(Protocol.DELTA).reader();
 		return new Delta(packet.int64(), MutationMode.byId((byte) packet.varInt()), packet.string(),
+				packet.nullableString(), packet.nullableBytes(),
 				packet.nullableString(), packet.nullableBytes());
 	}
 
@@ -175,6 +177,49 @@ final class FakeBackend implements AutoCloseable {
 			if (delta.seq() >= seq)
 				return delta;
 		}
+	}
+
+	void sendServerInfo(RemoteServer info) throws IOException {
+		PacketOut out = new PacketOut(Protocol.SERVER_INFO);
+		info.write(out);
+		out.frame().write(this.out);
+	}
+
+	List<RemoteServer> networkState() throws IOException {
+		PacketIn packet = await(Protocol.NETWORK_STATE).reader();
+		int count = packet.varInt();
+		List<RemoteServer> servers = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+			servers.add(RemoteServer.read(packet));
+		return servers;
+	}
+
+	void playerAction(PlayerAction action, List<String> targets, String payload) throws IOException {
+		PacketOut out = new PacketOut(Protocol.PLAYER_ACTION)
+				.varInt(action.id())
+				.varInt(targets.size());
+		targets.forEach(out::string);
+		out.string(payload).frame().write(this.out);
+	}
+
+	Delivery delivery() throws IOException {
+		PacketIn packet = await(Protocol.PLAYER_DELIVERY).reader();
+		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
+		int count = packet.varInt();
+		List<String> targets = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+			targets.add(packet.string());
+		return new Delivery(action, targets, packet.string());
+	}
+
+	void consoleCommand(List<String> servers, String command) throws IOException {
+		PacketOut out = new PacketOut(Protocol.CONSOLE_COMMAND).varInt(servers.size());
+		servers.forEach(out::string);
+		out.string(command).frame().write(this.out);
+	}
+
+	String awaitConsoleCommand() throws IOException {
+		return await(Protocol.CONSOLE_COMMAND).reader().string();
 	}
 
 	long ping(long nonce) throws IOException {
@@ -230,6 +275,37 @@ final class FakeBackend implements AutoCloseable {
 		}
 	}
 
+	/** @return the next frame, or null if none arrives within {@code timeoutMs} */
+	Frame take(long timeoutMs) throws IOException {
+		socket.setSoTimeout((int) timeoutMs);
+		try {
+			return take();
+		} finally {
+			socket.setSoTimeout((int) TIMEOUT_MS);
+		}
+	}
+
+	/**
+	 * Every NETWORK_STATE frame that arrives before the line goes quiet, so a test
+	 * can look at the last one a backend was left holding.
+	 */
+	List<List<RemoteServer>> statesUntilQuiet(long quietMs) throws IOException {
+		List<List<RemoteServer>> seen = new ArrayList<>();
+		while (true) {
+			Frame frame = take(quietMs);
+			if (frame == null)
+				return seen;
+			if (frame.opcode != Protocol.NETWORK_STATE)
+				continue;
+			PacketIn packet = frame.reader();
+			int count = packet.varInt();
+			List<RemoteServer> servers = new ArrayList<>(count);
+			for (int i = 0; i < count; i++)
+				servers.add(RemoteServer.read(packet));
+			seen.add(servers);
+		}
+	}
+
 	Frame await(byte opcode) throws IOException {
 		while (true) {
 			Frame frame = take();
@@ -260,7 +336,11 @@ final class FakeBackend implements AutoCloseable {
 		}
 	}
 
-	record Delta(long seq, MutationMode mode, String name, String type, byte[] value) {
+	record Delta(long seq, MutationMode mode, String name, String type, byte[] value,
+			String wasType, byte[] wasValue) {
+	}
+
+	record Delivery(PlayerAction action, List<String> targets, String payload) {
 	}
 
 	record Sync(boolean resumed, boolean fullSnapshot, long seq, List<String> snapshot,

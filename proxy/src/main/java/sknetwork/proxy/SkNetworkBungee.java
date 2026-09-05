@@ -24,6 +24,7 @@ import sknetwork.proxy.core.ProxySettings;
 import sknetwork.proxy.core.SknetConsole;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
 import net.md_5.bungee.api.plugin.Plugin;
@@ -56,6 +57,7 @@ public final class SkNetworkBungee extends Plugin {
 
 		try {
 			server = ProxyBoot.start(settings, getDataFolder(), log);
+			server.actions(this::connect);
 		} catch (IOException e) {
 			getLogger().severe("could not bind " + settings.bind() + ":" + settings.port()
 					+ " - " + e.getMessage());
@@ -68,6 +70,17 @@ public final class SkNetworkBungee extends Plugin {
 
 		getLogger().info(SkNetwork.NAME + " " + getDescription().getVersion()
 				+ " (protocol " + Protocol.VERSION + ") running as the PROXY half");
+	}
+
+	/** Moving a player between servers is the one thing only the proxy can do. */
+	private boolean connect(String player, String target) {
+		ProxiedPlayer moving = getProxy().getPlayer(player);
+		ServerInfo destination = getProxy().getServerInfo(target);
+		if (moving == null || destination == null)
+			return false;
+
+		moving.connect(destination);
+		return true;
 	}
 
 	private void startMetrics() {
