@@ -153,8 +153,10 @@ public class EffAtomic extends Effect {
 		debug(event, true);
 		SkNetworkSpigot plugin = SkNetworkSpigot.get();
 		TriggerItem next = getNext();
-		AtomicChange change = plugin == null ? null : build(event, plugin);
+		if (plugin == null)
+			return next;
 
+		AtomicChange change = build(event, plugin);
 		if (change == null || next == null) {
 			if (change != null)
 				plugin.atomic(change);
