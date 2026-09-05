@@ -5,6 +5,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -15,7 +17,9 @@ import sknetwork.common.Frame;
 import sknetwork.common.MutationMode;
 import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
+import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
+import sknetwork.common.RemoteServer;
 
 /**
  * The backend's connection to the proxy. A read thread that reconnects on its own,
@@ -27,6 +31,14 @@ final class ProxyClient {
 
 	private static final long RETRY_MIN_MS = 1_000;
 	private static final long RETRY_MAX_MS = 30_000;
+
+	/**
+	 * Pings go out every five seconds, so this is half a minute of silence. A proxy
+	 * that is gone without closing the socket, which is what a cable pull or a
+	 * hard reboot looks like, otherwise stays "connected" for the fifteen minutes
+	 * TCP takes to give up, and every write in that time is accepted and lost.
+	 */
+	private static final int PINGS_BEFORE_GIVING_UP = 6;
 
 	private final SkNetworkSpigot plugin;
 	private final String host;
@@ -51,6 +63,9 @@ final class ProxyClient {
 	private volatile String lastError;
 	private volatile long latencyMs = -1;
 	private volatile long syncedAt;
+
+	/** Main thread only: ping() runs on the scheduler and PONG lands via the applier. */
+	private int unansweredPings;
 
 	/** Sent in HELLO, so a brief disconnect costs a few deltas instead of the whole map. */
 	private volatile long lastSeq;
@@ -91,9 +106,14 @@ final class ProxyClient {
 		return inbound;
 	}
 
-	void markReady() {
+	/** @return false when the session that finished syncing has already gone away */
+	boolean markReady() {
+		if (outbound == null)
+			return false;
 		state = SyncState.READY;
 		syncedAt = System.currentTimeMillis();
+		unansweredPings = 0;
+		return true;
 	}
 
 	/** @return round trip to the proxy in ms, or -1 before the first reply */
@@ -103,12 +123,32 @@ final class ProxyClient {
 
 	void recordPong(long sentAt) {
 		latencyMs = Math.max(0, System.currentTimeMillis() - sentAt);
+		unansweredPings = 0;
 	}
 
 	void ping() {
 		BlockingQueue<Frame> queue = outbound;
-		if (state == SyncState.READY && queue != null)
-			queue.add(new PacketOut(Protocol.PING).int64(System.currentTimeMillis()).frame());
+		if (state != SyncState.READY || queue == null) {
+			unansweredPings = 0;
+			return;
+		}
+
+		if (unansweredPings >= PINGS_BEFORE_GIVING_UP) {
+			unansweredPings = 0;
+			lastError = "no answer to " + PINGS_BEFORE_GIVING_UP + " pings";
+			plugin.getLogger().warning("the proxy has not answered the last " + PINGS_BEFORE_GIVING_UP
+					+ " pings, dropping the connection. Writes since the last answer may never have "
+					+ "arrived, so the next sync pulls everything rather than resuming.");
+			// resuming would keep whatever was written into the void as this server's truth
+			DeltaApplier applier = plugin.applier();
+			if (applier != null)
+				applier.requestFullSnapshot();
+			dropConnection();
+			return;
+		}
+
+		unansweredPings++;
+		queue.add(new PacketOut(Protocol.PING).int64(System.currentTimeMillis()).frame());
 	}
 
 	long lastSeq() {
@@ -147,6 +187,29 @@ final class ProxyClient {
 			return false;
 		queue.add(frame);
 		return true;
+	}
+
+	/** Tells the proxy what this server is and who is on it. */
+	boolean sendServerInfo(RemoteServer info) {
+		PacketOut out = new PacketOut(Protocol.SERVER_INFO);
+		info.write(out);
+		return send(out.frame());
+	}
+
+	/** @param targets empty means every player on the network */
+	boolean sendPlayerAction(PlayerAction action, List<String> targets, String payload) {
+		PacketOut out = new PacketOut(Protocol.PLAYER_ACTION)
+				.varInt(action.id())
+				.varInt(targets.size());
+		targets.forEach(out::string);
+		return send(out.string(payload).frame());
+	}
+
+	/** @param servers empty means every server on the network */
+	boolean sendConsoleCommand(List<String> servers, String command) {
+		PacketOut out = new PacketOut(Protocol.CONSOLE_COMMAND).varInt(servers.size());
+		servers.forEach(out::string);
+		return send(out.string(command).frame());
 	}
 
 	boolean sendMutation(MutationMode mode, String name, String type, byte[] value, String display) {
@@ -202,6 +265,9 @@ final class ProxyClient {
 				// whatever is queued belongs to the dead session, and the reconnect
 				// brings a fresh snapshot anyway
 				inbound.clear();
+				DeltaApplier applier = plugin.applier();
+				if (applier != null)
+					applier.sessionEnded();
 				closeSocket();
 			}
 
@@ -277,13 +343,20 @@ final class ProxyClient {
 		} finally {
 			outbound = null;
 			queue.add(POISON);
+			// a write can still slip in behind the poison from Skript's thread, because it
+			// checked the state a moment before it flipped. the writer never sees those.
+			// draining may take the poison too, so a second one keeps the writer from
+			// parking on this queue for good
+			markUnsent(queue);
+			queue.add(POISON);
 		}
 	}
 
 	private void writerLoop(BlockingQueue<Frame> queue, DataOutputStream out, Socket connection) {
+		Frame frame = null;
 		try {
 			while (true) {
-				Frame frame = queue.take();
+				frame = queue.take();
 				if (frame == POISON)
 					return;
 				frame.write(out);
@@ -292,11 +365,41 @@ final class ProxyClient {
 			Thread.currentThread().interrupt();
 		} catch (IOException e) {
 			lastError = describe(e);
+			// this one and whatever is queued behind it never reached the proxy. Skript has
+			// already put the sets and deletes among them in its own map, so they are marked
+			// for the full snapshot that puts this server back in step
+			markUnsent(frame);
+			markUnsent(queue);
 			// this session's socket, never whichever one happens to be current
 			try {
 				connection.close();
 			} catch (IOException ignored) {
 			}
+		}
+	}
+
+	private void markUnsent(BlockingQueue<Frame> queue) {
+		List<Frame> left = new ArrayList<>();
+		queue.drainTo(left);
+		for (Frame frame : left)
+			markUnsent(frame);
+	}
+
+	/** Only a plain set or delete has a local copy to repair; an atomic never touched Skript's map. */
+	private void markUnsent(Frame frame) {
+		if (frame == null || frame == POISON || frame.opcode != Protocol.MUTATE)
+			return;
+		DeltaApplier applier = plugin.applier();
+		if (applier == null)
+			return;
+		try {
+			PacketIn packet = frame.reader();
+			packet.int64();
+			MutationMode mode = MutationMode.byId((byte) packet.varInt());
+			if (mode == MutationMode.SET || mode == MutationMode.DELETE)
+				applier.markUnsynced(SkriptBridge.normalize(plugin.prefix() + packet.string()));
+		} catch (IOException | RuntimeException ignored) {
+			// our own frame, so this cannot happen; and if it did, a resume is the worst case
 		}
 	}
 

@@ -46,4 +46,18 @@ scripts:
   max-file-kb: 512
   max-total-mb: 16
 
+# ─── Player features ──────────────────────────────────────────────────────────
+# Messaging players anywhere on the network, moving them between servers, and
+# looking up who is online where.
+#
+# Off means the proxy answers nothing about players and carries nothing to them.
+# Scripts using that syntax say so rather than failing quietly.
+players: true
+
+# Running a console command on another server.
+#
+# Anyone who can write a script on one backend gets console on every backend, so
+# this is off unless you turn it on deliberately.
+remote-commands: false
+
 debug: false

@@ -2,6 +2,7 @@ package sknetwork.spigot;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,9 +12,12 @@ import sknetwork.common.Manifest;
 import sknetwork.common.MutationMode;
 import sknetwork.common.PacketIn;
 import sknetwork.common.Protocol;
+import sknetwork.common.PlayerAction;
 import sknetwork.common.Throttle;
 import sknetwork.common.VariableName;
+import sknetwork.spigot.elements.events.NetworkVariableChangeEvent;
 import sknetwork.spigot.elements.types.AtomicResult;
+import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 /**
@@ -43,7 +47,15 @@ final class DeltaApplier extends BukkitRunnable {
 	/** Set by {@code /sknet resync}: pull everything rather than resume. */
 	private volatile boolean forceFull;
 
+	/**
+	 * Set by the client when a session ends. A snapshot cut off halfway leaves
+	 * {@link #arriving} holding names from it, and the next snapshot would then
+	 * never drop the ones deleted in between.
+	 */
+	private volatile boolean sessionEnded;
+
 	private Set<String> arriving;
+	private Object previous;
 	private long applied;
 	private long dropped;
 	private int snapshotEntries;
@@ -74,6 +86,11 @@ final class DeltaApplier extends BukkitRunnable {
 		forceFull = true;
 	}
 
+	/** Called off the main thread; the reset itself happens on the next tick. */
+	void sessionEnded() {
+		sessionEnded = true;
+	}
+
 	/** Whether a resume would leave this server holding values the network refused. */
 	boolean needsFullSnapshot() {
 		return forceFull || !unsynced.isEmpty();
@@ -82,6 +99,14 @@ final class DeltaApplier extends BukkitRunnable {
 	@Override
 	public void run() {
 		int budget = PER_TICK;
+
+		if (sessionEnded) {
+			// the dead session's frames were cleared with it, so what follows is a
+			// fresh sync and must not inherit half a snapshot
+			sessionEnded = false;
+			arriving = null;
+			snapshotEntries = 0;
+		}
 
 		while (budget > 0) {
 			Frame frame = inbound.poll();
@@ -109,7 +134,6 @@ final class DeltaApplier extends BukkitRunnable {
 
 		switch (frame.opcode) {
 			case Protocol.SNAPSHOT -> {
-				packet.bool(); // 'last', unused: readiness comes from SYNCED instead
 				int count = packet.varInt();
 
 				if (arriving == null)
@@ -117,7 +141,7 @@ final class DeltaApplier extends BukkitRunnable {
 				for (int i = 0; i < count; i++) {
 					String wireName = packet.string();
 					apply(MutationMode.SET, wireName, packet.nullableString(), packet.nullableBytes());
-					arriving.add(plugin.prefix() + wireName);
+					arriving.add(localName(wireName));
 				}
 				snapshotEntries += count;
 				return Math.max(count, 1);
@@ -127,18 +151,20 @@ final class DeltaApplier extends BukkitRunnable {
 				boolean fullSnapshot = packet.bool();
 
 				int removed = fullSnapshot ? reconcile() : 0;
+				int received = snapshotEntries;
+				snapshotEntries = 0;
+				arriving = null;
 				plugin.client().setLastSeq(seq);
-				plugin.client().markReady();
+				if (!plugin.client().markReady())
+					return 1;
 
 				if (fullSnapshot)
-					plugin.getLogger().info("synced at seq " + seq + ": " + snapshotEntries
+					plugin.getLogger().info("synced at seq " + seq + ": " + received
 							+ " variable(s) received"
 							+ (removed == 0 ? "" : ", " + removed + " stale one(s) dropped"));
 				else
 					plugin.getLogger().info("resynced at seq " + seq + ", mirror kept");
 
-				snapshotEntries = 0;
-				arriving = null;
 				plugin.onSynced();
 				return 1;
 			}
@@ -148,10 +174,13 @@ final class DeltaApplier extends BukkitRunnable {
 				String name = packet.string();
 				String type = packet.nullableString();
 				byte[] value = packet.nullableBytes();
+				String wasType = packet.nullableString();
+				byte[] wasValue = packet.nullableBytes();
 
 				// advance even when it could not be applied. asking again on the next
 				// reconnect would fail the same way.
 				try {
+					previous = wasValue == null ? null : SkriptBridge.read(wasType, wasValue);
 					apply(mode, name, type, value);
 				} finally {
 					plugin.client().setLastSeq(seq);
@@ -180,6 +209,20 @@ final class DeltaApplier extends BukkitRunnable {
 				plugin.client().recordPong(packet.int64());
 				return 1;
 			}
+			case Protocol.NETWORK_STATE -> {
+				plugin.network().replace(packet);
+				return 1;
+			}
+			case Protocol.PLAYER_DELIVERY -> {
+				deliver(packet);
+				return 1;
+			}
+			case Protocol.CONSOLE_COMMAND -> {
+				String command = packet.string();
+				plugin.getLogger().info("running '" + command + "' for the network");
+				org.bukkit.Bukkit.dispatchCommand(org.bukkit.Bukkit.getConsoleSender(), command);
+				return 1;
+			}
 			case Protocol.MANIFEST -> {
 				ScriptSync sync = plugin.scripts();
 				if (sync != null)
@@ -199,6 +242,29 @@ final class DeltaApplier extends BukkitRunnable {
 				plugin.getLogger().warning("ignoring unexpected opcode 0x"
 						+ Integer.toHexString(frame.opcode & 0xFF) + " from the proxy");
 				return 1;
+			}
+		}
+	}
+
+	private void deliver(PacketIn packet) throws IOException {
+		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
+		int count = packet.varInt();
+		Set<String> named = new HashSet<>();
+		for (int i = 0; i < count; i++)
+			named.add(packet.string().toLowerCase(Locale.ROOT));
+		String payload = packet.string();
+
+		if (named.isEmpty() && action == PlayerAction.MESSAGE)
+			plugin.getServer().getConsoleSender().sendMessage(NetworkText.fromJson(payload));
+
+		for (Player player : plugin.getServer().getOnlinePlayers()) {
+			if (!named.isEmpty() && !named.contains(player.getName().toLowerCase(Locale.ROOT)))
+				continue;
+			switch (action) {
+				case MESSAGE -> player.sendMessage(NetworkText.fromJson(payload));
+				case ACTION_BAR -> player.sendActionBar(NetworkText.fromJson(payload));
+				default -> {
+				}
 			}
 		}
 	}
@@ -237,12 +303,17 @@ final class DeltaApplier extends BukkitRunnable {
 			return;
 		}
 
-		String localName = plugin.prefix() + wireName;
+		// the proxy keeps names byte for byte, and one with a capital in it can arrive
+		// from a jar older than the fix in EffAtomic. Skript lowercases the name in
+		// every read, so it goes into the map lowercased too or no script can see it
+		wireName = SkriptBridge.normalize(wireName);
+		String localName = localName(wireName);
 
 		if (mode == MutationMode.DELETE || value == null) {
 			SkriptBridge.applyDelete(localName);
 			forget(localName);
 			applied++;
+			announce(wireName, null);
 			return;
 		}
 
@@ -253,6 +324,20 @@ final class DeltaApplier extends BukkitRunnable {
 		}
 		mirrored.add(localName);
 		applied++;
+		announce(wireName, SkriptBridge.read(type, value));
+	}
+
+	/** The name Skript sees, prefix included and cased the way Skript cases it. */
+	private String localName(String wireName) {
+		return SkriptBridge.normalize(plugin.prefix() + wireName);
+	}
+
+	/** A snapshot is not a change, so nothing fires while one is arriving. */
+	private void announce(String wireName, Object now) {
+		if (arriving != null || !plugin.isSynced())
+			return;
+		org.bukkit.Bukkit.getPluginManager().callEvent(
+				new NetworkVariableChangeEvent(wireName, now, previous));
 	}
 
 	private void warnUnreadable(String localName, String type) {

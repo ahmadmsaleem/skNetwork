@@ -24,23 +24,13 @@ final class VariableStore {
 		variables.put(name, new VariableEntry(type, value, display, seq));
 	}
 
-	void delete(String name) {
-		if (!VariableName.isTree(name)) {
-			variables.remove(name);
-			return;
-		}
-
-		String base = VariableName.treeBase(name);
-		variables.keySet().removeIf(key -> VariableName.inTree(key, base));
-	}
-
-	/** Whether a delete of this name, tree or not, would actually remove anything. */
-	boolean matches(String name) {
+	/** @return whether anything was there to remove, so a no-op delete costs no sequence number */
+	boolean delete(String name) {
 		if (!VariableName.isTree(name))
-			return variables.containsKey(name);
+			return variables.remove(name) != null;
 
 		String base = VariableName.treeBase(name);
-		return variables.keySet().stream().anyMatch(key -> VariableName.inTree(key, base));
+		return variables.keySet().removeIf(key -> VariableName.inTree(key, base));
 	}
 
 	VariableEntry get(String name) {

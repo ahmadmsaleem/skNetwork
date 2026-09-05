@@ -7,6 +7,7 @@ import java.net.Socket;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +17,9 @@ import sknetwork.common.Manifest;
 import sknetwork.common.MutationMode;
 import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
+import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
+import sknetwork.common.RemoteServer;
 
 /**
  * One connected backend. A reader thread turns frames into queued mutations, a
@@ -31,6 +34,7 @@ final class BackendConnection {
 	private final NetworkServer server;
 	private final Socket socket;
 	private final BlockingQueue<Frame> outbound = new LinkedBlockingQueue<>();
+	private final AtomicLong queuedBytes = new AtomicLong();
 	private final AtomicBoolean closed = new AtomicBoolean();
 
 	private final String address;
@@ -71,8 +75,17 @@ final class BackendConnection {
 	}
 
 	void send(Frame frame) {
-		if (!closed.get())
-			outbound.add(frame);
+		if (closed.get())
+			return;
+		outbound.add(frame);
+
+		long waiting = queuedBytes.addAndGet(frame.payload.length);
+		if (waiting > server.backlogLimit() && !closed.get()) {
+			server.log().warn(name + " is not reading what the proxy sends: " + (waiting >> 20)
+					+ " MB is waiting for it, so it is being dropped. It will reconnect and "
+					+ "catch up on its own.");
+			close("dropped for not keeping up");
+		}
 	}
 
 	private void readerLoop() {
@@ -172,6 +185,9 @@ final class BackendConnection {
 			case Protocol.PING -> send(new PacketOut(Protocol.PONG).int64(packet.int64()).frame());
 			case Protocol.FETCH -> sendFiles(packet);
 			case Protocol.LOAD_RESULT -> reportLoad(packet);
+			case Protocol.SERVER_INFO -> server.serverInfo(this, RemoteServer.read(packet));
+			case Protocol.PLAYER_ACTION -> playerAction(packet);
+			case Protocol.CONSOLE_COMMAND -> consoleCommand(packet);
 			default -> server.log().warn("ignoring unexpected opcode 0x"
 					+ Integer.toHexString(frame.opcode & 0xFF) + " from " + name);
 		}
@@ -188,6 +204,26 @@ final class BackendConnection {
 			send(new PacketOut(Protocol.FILE).int64(version).string(path)
 					.nullableBytes(content).frame());
 		}
+	}
+
+	private void playerAction(PacketIn packet) throws IOException {
+		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
+		server.playerAction(this, action, names(packet), packet.string());
+	}
+
+	private void consoleCommand(PacketIn packet) throws IOException {
+		server.consoleCommand(this, names(packet), packet.string());
+	}
+
+	private static List<String> names(PacketIn packet) throws IOException {
+		int count = packet.varInt();
+		if (count < 0 || count > 100_000)
+			throw new IOException("count " + count + " is out of range");
+
+		List<String> names = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+			names.add(packet.string());
+		return names;
 	}
 
 	private void reportLoad(PacketIn packet) throws IOException {
@@ -215,6 +251,7 @@ final class BackendConnection {
 				if (frame == POISON)
 					return;
 				frame.write(out);
+				queuedBytes.addAndGet(-frame.payload.length);
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();

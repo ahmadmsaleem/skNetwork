@@ -25,6 +25,8 @@ import sknetwork.common.MutationMode;
 import sknetwork.common.PacketOut;
 import sknetwork.common.Protocol;
 import sknetwork.common.Manifest;
+import sknetwork.common.PlayerAction;
+import sknetwork.common.RemoteServer;
 import sknetwork.common.VariableEntry;
 import sknetwork.common.VariableName;
 
@@ -35,7 +37,17 @@ import sknetwork.common.VariableName;
  */
 public final class NetworkServer {
 
-		private static final int SNAPSHOT_CHUNK = 500;
+	private static final int SNAPSHOT_CHUNK = 500;
+
+	/**
+	 * A chunk closes once it holds this much, whatever its count. Each value fitted
+	 * in a frame on its way in, but five hundred of them together need not, and a
+	 * backend that reads a frame past the cap drops the connection, reconnects,
+	 * and is sent the same snapshot again for as long as it lives.
+	 */
+	private static final int SNAPSHOT_CHUNK_BYTES = Frame.MAX_LENGTH / 2;
+
+	private static final long DEFAULT_BACKLOG_BYTES = 64L * 1024 * 1024;
 
 	private final String bindHost;
 	private final int port;
@@ -64,6 +76,20 @@ public final class NetworkServer {
 	/** Null unless script distribution is turned on. */
 	private volatile ScriptLibrary scripts;
 
+	private final NetworkState state = new NetworkState();
+
+	/**
+	 * Every change to the state and the broadcast that follows it happen under this
+	 * lock. Two backends report at the same instant whenever a player hops between
+	 * them, and without it one backend can be handed the two frames in the other
+	 * order and be left holding the older picture.
+	 */
+	private final Object stateLock = new Object();
+	private volatile ProxyActions actions;
+	private volatile long backlogLimit = DEFAULT_BACKLOG_BYTES;
+	private volatile boolean players = true;
+	private volatile boolean remoteCommands;
+
 	private record Replayable(long seq, Frame frame) {
 	}
 
@@ -84,6 +110,32 @@ public final class NetworkServer {
 
 	public void scripts(ScriptLibrary library) {
 		this.scripts = library;
+	}
+
+	/** Only {@code connect} needs the platform; everything else is routed to a backend. */
+	public void actions(ProxyActions actions) {
+		this.actions = actions;
+	}
+
+	public void features(boolean players, boolean remoteCommands) {
+		this.players = players;
+		this.remoteCommands = remoteCommands;
+	}
+
+	public boolean playersEnabled() {
+		return players;
+	}
+
+	long backlogLimit() {
+		return backlogLimit;
+	}
+
+	void backlogLimit(long bytes) {
+		backlogLimit = bytes;
+	}
+
+	public boolean remoteCommandsEnabled() {
+		return remoteCommands;
 	}
 
 	ScriptLibrary scripts() {
@@ -197,15 +249,113 @@ public final class NetworkServer {
 
 			log.warn(joining.name() + " connected from " + joining.address() + ", but a backend "
 					+ "called " + existing.name() + " is already connected from " + existing.address()
-					+ ". Two servers sharing a name both get the same scripts, and anything keyed on "
-					+ "the server name, such as {?online::" + joining.name() + "::*}, is written by "
-					+ "both. Give each backend its own 'server-name' in config.yml.");
+					+ ". If that server just crashed or lost its network, this is its old socket "
+					+ "still being held, and it drops on its own. Otherwise: Two servers sharing a "
+					+ "name both get the same scripts, and anything keyed on the server name, such "
+					+ "as {?online::" + joining.name() + "::*}, is written by both. Give each backend "
+					+ "its own 'server-name' in config.yml.");
 			return;
 		}
 	}
 
 	void unregister(BackendConnection connection) {
 		connections.remove(connection);
+		synchronized (stateLock) {
+			// only what this connection reported. a rejected handshake or a socket that
+			// died long ago must not remove the entry of the backend now using the name
+			if (state.remove(connection, connection.name()))
+				broadcastState();
+		}
+	}
+
+	/** A backend told us about itself, so everyone else gets the new picture. */
+	void serverInfo(BackendConnection origin, RemoteServer info) {
+		synchronized (stateLock) {
+			state.put(origin, info);
+			broadcastState();
+		}
+	}
+
+	/** Call with {@link #stateLock} held. */
+	private void broadcastState() {
+		if (!players)
+			return;
+
+		Frame frame = state.frame();
+		for (BackendConnection connection : connections)
+			if (connection.isReady())
+				connection.send(frame);
+	}
+
+	void sendStateTo(BackendConnection target) {
+		if (!players)
+			return;
+		synchronized (stateLock) {
+			target.send(state.frame());
+		}
+	}
+
+	/**
+	 * Sends one action on to whoever can carry it out. A player nobody is holding is
+	 * dropped, the same way a delete of a key nobody has costs nothing.
+	 */
+	void playerAction(BackendConnection origin, PlayerAction action, List<String> targets,
+			String payload) {
+		if (!players) {
+			log.debug("ignored " + action + " from " + origin.name() + ": player features are off");
+			return;
+		}
+
+		if (action == PlayerAction.CONNECT) {
+			ProxyActions platform = actions;
+			if (platform == null)
+				return;
+			for (String player : targets)
+				platform.connect(player, payload);
+			return;
+		}
+
+		if (targets.isEmpty()) {
+			Frame frame = delivery(action, List.of(), payload);
+			for (BackendConnection connection : connections)
+				if (connection.isReady())
+					connection.send(frame);
+			return;
+		}
+
+		state.route(targets).forEach((server, holding) -> {
+			for (BackendConnection connection : connections)
+				if (connection.isReady() && connection.name().equals(server))
+					connection.send(delivery(action, holding, payload));
+		});
+	}
+
+	private static Frame delivery(PlayerAction action, List<String> targets, String payload) {
+		PacketOut out = new PacketOut(Protocol.PLAYER_DELIVERY)
+				.varInt(action.id())
+				.varInt(targets.size());
+		targets.forEach(out::string);
+		return out.string(payload).frame();
+	}
+
+	/** @param servers empty means every backend */
+	void consoleCommand(BackendConnection origin, List<String> servers, String command) {
+		if (!remoteCommands) {
+			log.warn(origin.name() + " tried to run '" + command + "' on another server, but "
+					+ "'remote-commands' is off in the proxy config. Anyone who can write a script "
+					+ "on one backend would otherwise have console on all of them.");
+			return;
+		}
+
+		Frame frame = new PacketOut(Protocol.CONSOLE_COMMAND).string(command).frame();
+		for (BackendConnection connection : connections) {
+			if (!connection.isReady())
+				continue;
+			if (servers.isEmpty() || servers.contains(connection.name()))
+				connection.send(frame);
+		}
+		log.info(origin.name() + " ran '" + command + "' on "
+				+ (servers.isEmpty() ? "every server" : String.join(", ", servers)));
 	}
 
 	/** Returns at once; the writer thread does the work. */
@@ -235,27 +385,29 @@ public final class NetworkServer {
 			return;
 		}
 
-		if (!outcome.changed()) {
-			origin.reply(mutation, outcome, sequence.get());
+		if (outcome.delete() && !store.delete(name)) {
+			origin.reply(mutation, Outcome.unchanged(), sequence.get());
 			return;
 		}
 
 		long seq = sequence.incrementAndGet();
-		if (outcome.delete())
-			store.delete(name);
-		else
+		if (!outcome.delete())
 			store.set(name, outcome.type(), outcome.value(), outcome.display(), seq);
 
 		changeLog.append(seq, name, outcome.delete() ? null : outcome.type(),
 				outcome.delete() ? null : outcome.value(),
 				outcome.delete() ? null : outcome.display());
 
+		// the previous value rides along because the server that wrote it has already
+		// overwritten its own copy by the time this gets back, so only we still know
 		Frame delta = new PacketOut(Protocol.DELTA)
 				.int64(seq)
 				.varInt(outcome.delete() ? MutationMode.DELETE.id() : MutationMode.SET.id())
 				.string(name)
 				.nullableString(outcome.delete() ? null : outcome.type())
 				.nullableBytes(outcome.delete() ? null : outcome.value())
+				.nullableString(current == null ? null : current.type)
+				.nullableBytes(current == null ? null : current.value)
 				.frame();
 
 		remember(seq, delta);
@@ -286,9 +438,7 @@ public final class NetworkServer {
 					? Outcome.refused("no value attached")
 					: Outcome.set(mutation.type(), mutation.value(), mutation.display());
 
-			case DELETE -> store.matches(mutation.name())
-					? Outcome.deleted()
-					: Outcome.unchanged();
+			case DELETE -> Outcome.deleted();
 
 			case ADD, REMOVE -> add(mutation, current);
 
@@ -511,30 +661,38 @@ public final class NetworkServer {
 			}
 			target.send(new PacketOut(Protocol.SYNCED).int64(current).bool(false).frame());
 			target.markReady();
+			sendStateTo(target);
 			pushTo(target);
 			log.info(target.name() + " resumed from seq " + lastSeq + ": " + replayed + " delta(s) replayed");
 			return;
 		}
 
 		List<Map.Entry<String, VariableEntry>> pending = store.entries();
-		for (int start = 0; start < pending.size(); start += SNAPSHOT_CHUNK) {
-			int end = Math.min(start + SNAPSHOT_CHUNK, pending.size());
-
-			PacketOut out = new PacketOut(Protocol.SNAPSHOT)
-					.bool(end == pending.size())
-					.varInt(end - start);
-			for (Map.Entry<String, VariableEntry> entry : pending.subList(start, end)) {
-				out.string(entry.getKey())
+		int start = 0;
+		while (start < pending.size()) {
+			// the count goes first, so the entries are staged and the header written last
+			PacketOut entries = new PacketOut(Protocol.SNAPSHOT);
+			int end = start;
+			while (end < pending.size() && end - start < SNAPSHOT_CHUNK
+					&& (end == start || entries.size() < SNAPSHOT_CHUNK_BYTES)) {
+				Map.Entry<String, VariableEntry> entry = pending.get(end++);
+				entries.string(entry.getKey())
 						.nullableString(entry.getValue().type)
 						.nullableBytes(entry.getValue().value);
 			}
-			target.send(out.frame());
+
+			target.send(new PacketOut(Protocol.SNAPSHOT)
+					.varInt(end - start)
+					.raw(entries.frame().payload)
+					.frame());
+			start = end;
 		}
 
 		target.send(new PacketOut(Protocol.SYNCED).int64(current).bool(true).frame());
 
 		// only now does it start receiving deltas, so none can overtake the snapshot
 		target.markReady();
+		sendStateTo(target);
 		pushTo(target);
 		if (lastSeq > 0)
 			log.info(target.name() + " asked to resume from seq " + lastSeq

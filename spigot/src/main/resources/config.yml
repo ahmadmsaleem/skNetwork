@@ -43,5 +43,3 @@ atomic-timeout: 5s
 # few bytes on the wire. Values over 64kB are sent without one either way. Turn it
 # off if this server writes constantly and nobody uses the proxy console.
 display-values: true
-
-debug: false

@@ -74,6 +74,21 @@ public final class PacketOut {
 	}
 
 
+	/** Appends bytes as they are, for a payload built in pieces. */
+	public PacketOut raw(byte[] payload) {
+		try {
+			out.write(payload);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		return this;
+	}
+
+	/** How many payload bytes are written so far. */
+	public int size() {
+		return bytes.size();
+	}
+
 	public Frame frame() {
 		return new Frame(opcode, bytes.toByteArray());
 	}

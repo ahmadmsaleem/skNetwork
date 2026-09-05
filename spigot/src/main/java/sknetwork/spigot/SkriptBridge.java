@@ -1,6 +1,7 @@
 package sknetwork.spigot;
 
 import java.lang.reflect.Method;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,7 +17,7 @@ import ch.njol.skript.variables.VariablesStorage;
  * skips the save queue but ignores null values, so a delete has to go through
  * {@code setVariable} and be suppressed by name instead.
  */
-final class SkriptBridge {
+public final class SkriptBridge {
 
 	private static final Method VARIABLE_LOADED = findVariableLoaded();
 
@@ -39,6 +40,18 @@ final class SkriptBridge {
 
 	static boolean hasFastPath() {
 		return VARIABLE_LOADED != null;
+	}
+
+	/**
+	 * Skript lowercases every name a script reads or writes, unless 'case-insensitive
+	 * variables' is off in its config, but leaves a name handed to it by a storage
+	 * alone. So anything that puts a name into Skript's map, sends one on a script's
+	 * behalf, or compares one against a script's has to apply the same rule, or the
+	 * two spellings never meet: the value sits in the map under {?coins::Notch} and
+	 * every script asks for {?coins::notch}.
+	 */
+	public static String normalize(String name) {
+		return Variables.caseInsensitiveVariables ? name.toLowerCase(Locale.ENGLISH) : name;
 	}
 
 	/**

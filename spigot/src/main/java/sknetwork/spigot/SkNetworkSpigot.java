@@ -1,14 +1,19 @@
 package sknetwork.spigot;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import ch.njol.skript.Skript;
+import ch.njol.skript.util.Version;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 import ch.njol.skript.variables.Variables;
+import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
+import sknetwork.common.RemoteServer;
 import sknetwork.common.SkNetwork;
 import sknetwork.common.MutationMode;
 import sknetwork.common.Throttle;
@@ -17,6 +22,8 @@ import sknetwork.spigot.elements.events.NetworkSyncEvent;
 import sknetwork.spigot.elements.types.AtomicChange;
 import sknetwork.spigot.elements.types.AtomicResult;
 import sknetwork.spigot.modules.NetworkModule;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -27,11 +34,14 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 
 	private static SkNetworkSpigot instance;
 
+	private static final Version OLDEST_SKRIPT = new Version(2, 16, 0);
+
 	private SkNetworkConfig config;
 	private ProxyClient client;
 	private DeltaApplier applier;
 	private ScriptSync scripts;
 	private AtomicRequests requests;
+	private final NetworkCache network = new NetworkCache();
 
 	private final Throttle dropWarnings = new Throttle(10_000);
 	private final AtomicLong droppedWrites = new AtomicLong();
@@ -73,6 +83,15 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 
 	@Override
 	public void onEnable() {
+		if (Skript.getVersion().isSmallerThan(OLDEST_SKRIPT)) {
+			getLogger().severe(SkNetwork.NAME + " " + getPluginMeta().getVersion() + " needs Skript "
+					+ OLDEST_SKRIPT + " or newer, and this server runs Skript " + Skript.getVersion()
+					+ ". Network variables are off until Skript is updated: every write to a '"
+					+ config.prefix() + "' variable is refused, and none of the network syntax loads. "
+					+ "Nothing in variables.csv is touched.");
+			return;
+		}
+
 		getLogger().info(SkNetwork.NAME + " " + getPluginMeta().getVersion()
 				+ " (protocol " + Protocol.VERSION + ") running as a BACKEND half, known as "
 				+ config.serverName());
@@ -84,6 +103,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		client = new ProxyClient(this, config.host(), config.port(), config.token(), config.serverName());
 		scripts = new ScriptSync(this, new File(skriptDataFolder(), "scripts"));
 		applier = new DeltaApplier(this, client.inboundQueue());
+		getServer().getPluginManager().registerEvents(new PlayerWatch(this), this);
 		applier.runTaskTimer(this, 1L, 1L);
 		client.start();
 
@@ -168,6 +188,39 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		return requestId;
 	}
 
+	/** @param targets empty for every player on the network */
+	public boolean playerAction(PlayerAction action, List<String> targets, String payload) {
+		return client != null && client.sendPlayerAction(action, targets, payload);
+	}
+
+	/** @param servers empty for every server on the network */
+	public boolean consoleCommand(List<String> servers, String command) {
+		return client != null && client.sendConsoleCommand(servers, command);
+	}
+
+	public NetworkCache network() {
+		return network;
+	}
+
+	/** Tells the proxy what this server is and who is on it right now. */
+	void reportServerInfo() {
+		if (client == null)
+			return;
+
+		List<String> online = new ArrayList<>();
+		for (Player player : getServer().getOnlinePlayers())
+			online.add(player.getName());
+
+		List<String> whitelisted = new ArrayList<>();
+		for (OfflinePlayer player : getServer().getWhitelistedPlayers())
+			if (player.getName() != null)
+				whitelisted.add(player.getName());
+
+		client.sendServerInfo(new RemoteServer(serverName(),
+				getServer().getMotd(), getServer().getVersion(),
+				getServer().getMaxPlayers(), online, whitelisted));
+	}
+
 	ProxyClient client() {
 		return client;
 	}
@@ -230,10 +283,12 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	}
 
 	void onSynced() {
+		reportServerInfo();
 		fire(new NetworkSyncEvent());
 	}
 
 	void onDisconnected() {
+		network.clear();
 		fire(new NetworkDisconnectEvent());
 	}
 
@@ -284,10 +339,20 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		// an empty prefix plus a catch-all pattern is a real choice: share everything.
 		// a prefix with a catch-all pattern is not, because we would drop the rest.
 		if (SkNetworkStorage.isCatchAll() && !config.prefix().isEmpty()) {
-			refuseCatchAll();
+			refuseStorage("has a catch-all 'pattern', so Skript hands us every variable on this "
+					+ "server. Every variable without '" + config.prefix() + "' is being dropped "
+					+ "right now: not sent to the network, and not written to variables.csv "
+					+ "either.");
 			return;
 		}
 		if (SkNetworkStorage.isConfigured()) {
+			if (!SkNetworkStorage.coversPrefix(config.prefix())) {
+				refuseStorage("has a 'pattern' that does not cover '" + config.prefix()
+						+ "'. Skript would take our writes and then persist every change the "
+						+ "network sends back through the catch-all database, so the whole "
+						+ "network would end up in this server's variables.csv.");
+				return;
+			}
 			getLogger().info("Skript is routing '" + config.prefix() + "' variables to us (pattern "
 					+ SkNetworkStorage.pattern() + ")");
 			return;
@@ -304,10 +369,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		// Staying connected without a storage is worse than being offline: every
 		// inbound change would be written to variables.csv by the catch-all
 		// database instead of ours.
-		if (client != null)
-			client.stop();
-		if (applier != null)
-			applier.cancel();
+		stopNetworkVariables();
 
 		getLogger().warning("no 'skNetwork' database is configured in plugins/Skript/config.sk,");
 		getLogger().warning("so network variables are disabled on this server. Add, ABOVE the");
@@ -317,22 +379,25 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		getLogger().warning("        pattern: " + SkriptConfigPatcher.patternFor(config.prefix()));
 	}
 
-	/**
-	 * Skript could not read our {@code pattern:} line, so it hands us every variable
-	 * on the server. Anything without our prefix would then be dropped: not sent to
-	 * the network, and not written to variables.csv either, because we told Skript
-	 * we had saved it. Stopping is the only safe answer.
-	 */
-	private void refuseCatchAll() {
+	private void stopNetworkVariables() {
 		if (client != null)
 			client.stop();
 		if (applier != null)
 			applier.cancel();
+	}
 
-		getLogger().severe("The skNetwork database in plugins/Skript/config.sk has a catch-all");
-		getLogger().severe("'pattern', so Skript hands us every variable on this");
-		getLogger().severe("server. Every variable without '" + config.prefix() + "' is being dropped "
-				+ "right now: not sent to the network, and not written to variables.csv either.");
+	/**
+	 * Skript could not read our {@code pattern:} line the way we meant it, so it
+	 * either hands us every variable on the server or persists our inbound changes
+	 * itself. Either way this server would lose or leak data, and stopping is the
+	 * only safe answer.
+	 *
+	 * @param problem what is wrong with the database block, as one sentence
+	 */
+	private void refuseStorage(String problem) {
+		stopNetworkVariables();
+
+		getLogger().severe("The skNetwork database in plugins/Skript/config.sk " + problem);
 		getLogger().severe("Network variables are disabled here until that line is fixed.");
 		if (config.prefix().indexOf('#') >= 0)
 			getLogger().severe("A '#' starts a comment in config.sk, so it cannot be a prefix at all. "

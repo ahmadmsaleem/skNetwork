@@ -1,6 +1,7 @@
 package sknetwork.spigot;
 
 import java.io.File;
+import java.util.regex.Pattern;
 
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.variables.VariablesStorage;
@@ -51,6 +52,23 @@ public final class SkNetworkStorage extends VariablesStorage {
 	public static boolean isCatchAll() {
 		SkNetworkStorage storage = instance;
 		return accepted && storage != null && storage.getNamePattern() == null;
+	}
+
+	/**
+	 * Whether Skript's pattern actually covers the prefix we were told to use.
+	 * When it does not, Skript accepts our writes but persists every inbound change
+	 * through the catch-all instead, which puts the whole network mirror in
+	 * variables.csv.
+	 */
+	public static boolean coversPrefix(String prefix) {
+		SkNetworkStorage storage = instance;
+		if (!accepted || storage == null)
+			return false;
+
+		Pattern pattern = storage.getNamePattern();
+		if (pattern == null)
+			return prefix.isEmpty();
+		return pattern.matcher(prefix + "probe::name").matches();
 	}
 
 	@Override

@@ -14,7 +14,7 @@ import sknetwork.common.Protocol;
 public record ProxySettings(String bind, int port, String token, boolean debug,
 		String logName, long flushIntervalMs, double compactRatio, int replayBuffer,
 		boolean scriptsEnabled, Map<String, List<String>> groups,
-		long maxFileBytes, long maxTotalBytes) {
+		long maxFileBytes, long maxTotalBytes, boolean players, boolean remoteCommands) {
 
 	public static ProxySettings from(ConfigSource config) {
 		Map<String, List<String>> groups = new LinkedHashMap<>();
@@ -33,7 +33,9 @@ public record ProxySettings(String bind, int port, String token, boolean debug,
 				config.flag("scripts.enabled", false),
 				groups,
 				config.integer("scripts.max-file-kb", 512) * 1024L,
-				config.integer("scripts.max-total-mb", 16) * 1024L * 1024L);
+				config.integer("scripts.max-total-mb", 16) * 1024L * 1024L,
+				config.flag("players", true),
+				config.flag("remote-commands", false));
 	}
 
 	/** Null, blank or "none" all mean keep nothing. */

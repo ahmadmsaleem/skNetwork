@@ -29,7 +29,12 @@ public final class ProxyBoot {
 				logFile, settings.flushIntervalMs(), settings.compactRatio(),
 				settings.replayBuffer(), log);
 		server.start();
+		server.features(settings.players(), settings.remoteCommands());
 		configureScripts(server, settings, dataFolder, log);
+
+		if (settings.remoteCommands())
+			log.warn("'remote-commands' is on. Any script on any backend can run a console "
+					+ "command on every other backend.");
 		return server;
 	}
 
