@@ -79,6 +79,12 @@ The two halves use different names on purpose. A proxy handles any command it kn
 before the game server sees it, so keeping `/sknet` free means it always reaches the
 server you are standing on, where being an operator is already enough.
 
+---
+## Links
+[![github](https://cdn.modrinth.com/data/cached_images/75ce063aed1ebd362650fad14579ca22f375a392.png)](https://github.com/ahmadmsaleem/skNetwork) [![skNetwork wiki](https://cdn.modrinth.com/data/cached_images/35010223dc83c95dd3b7a92740ca87eea707d709_0.webp)](https://github.com/ahmadmsaleem/skNetwork/wiki)
+
+[![Get on skUnity](https://docs.skunity.com/skunity/library/Docs/Assets/assets/images/buttons/v2/get-the-syntax-square.png)](https://docs.skunity.com/syntax/search/addon:skNetwork)[![SkriptHubViewTheDocs](http://skripthub.net/static/addon/ViewTheDocsButton.png)](http://skripthub.net/docs/?addon=skNetwork) [![skDocks](https://skdocs.org/viewdocs.png)](https://skdocs.org/docs?addon=skNetwork)
+
 
 ---
 skNetwork uses bStats for anonymous usage stats. You can opt out in `plugins/bStats/config.yml`.
