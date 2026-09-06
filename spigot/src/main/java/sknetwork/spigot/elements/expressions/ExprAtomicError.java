@@ -17,16 +17,16 @@ import sknetwork.spigot.elements.types.AtomicResult;
 import sknetwork.spigot.elements.types.LastAtomic;
 
 @Name("Atomic Error")
-@Description({
-		"Why the proxy refused the last `atomically ... and wait`, or why no reply came back.",
-		"A refusal reads like `already set`, `current value does not match`, or a message naming the "
-				+ "variable that would drop below its floor. Those all mean the change did not happen.",
-		"A timeout instead says that whether it applied is unknown. Use `the atomic change timed out` "
-				+ "to tell the two apart rather than reading this text.",
-		"Empty when the change was taken."
-})
+@Description("""
+		Why the proxy refused the last `atomically ... and wait`, or why no reply came back.
+		A refusal reads like `already set`, `current value does not match`, or a message naming the variable that would drop below its floor. Those all mean the change did not happen.
+		A timeout instead says that whether it applied is unknown. Use `the atomic change timed out` to tell the two apart rather than reading this text.
+		Empty when the change was taken.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes
+		""")
 @Example("""
-		atomically set {?rank::%uuid of player%} to "vip" if it is "default" and wait
+		atomically set {?rank::%player%} to "vip" if it is "default" and wait
 		if the atomic change was refused:
 			send "Could not promote: %the atomic error%"
 		""")

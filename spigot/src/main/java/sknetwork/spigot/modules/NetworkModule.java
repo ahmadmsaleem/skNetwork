@@ -70,46 +70,49 @@ public final class NetworkModule implements AddonModule {
 	private void registerEvents() {
 		Skript.registerEvent("Network Sync", SimpleEvent.class, NetworkSyncEvent.class,
 						"network sync[ed]")
-				.description(
-						"Fires on this server once its copy of the network variables is filled in and "
-								+ "the proxy is accepting writes.",
-						"It fires again after every reconnect, so use it to rebuild anything this "
-								+ "server owns while it is running. A crash never fires `on quit`, so a "
-								+ "cross-server player list keeps everyone who was online when the "
-								+ "server died until something clears it.")
-				.examples(
-						"on network sync:",
-						"\tdelete {?online::%network server name%::*}",
-						"\tloop all players:",
-						"\t\tadd loop-player's name to {?online::%network server name%::*}")
+				.description("""
+						Fires on this server once its copy of the network variables is filled in and the proxy is accepting writes.
+						It fires again after every reconnect, so use it to rebuild anything this server owns while it is running. A crash never fires `on quit`, so a cross-server player list keeps everyone who was online when the server died until something clears it.
+						Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
+						""")
+				.examples("""
+						on network sync:
+							delete {?online::%network server name%::*}
+							loop all players:
+								add loop-player's name to {?online::%network server name%::*}
+						""")
 				.since("0.0.1");
 
 		Skript.registerEvent("Network Disconnect", SimpleEvent.class, NetworkDisconnectEvent.class,
 						"network disconnect[ed]")
-				.description(
-						"Fires on this server when it loses the proxy.",
-						"Reads keep working from the copy this server already holds. Writes are "
-								+ "refused until it reconnects.")
-				.examples(
-						"on network disconnect:",
-						"\tbroadcast \"Lost the proxy. Balances are read only for now.\"")
+				.description("""
+						Fires on this server when it loses the proxy.
+						Reads keep working from the copy this server already holds. Writes are refused until it reconnects.
+						Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
+						""")
+				.examples("""
+						on network disconnect:
+							broadcast "Lost the proxy. Balances are read only for now."
+						""")
 				.since("0.0.1");
 
 		Skript.registerEvent("Network Variable Change", EvtNetworkVariable.class,
 						NetworkVariableChangeEvent.class,
 						"network variable change [of %-string%]")
-				.description(
-						"Fires on every server the moment a network variable changes, including "
-								+ "the one that wrote it.",
-						"Give it a name to listen to one branch instead of every write on the "
-								+ "network. A `*` is a wildcard, the same as `/sknetproxy dump`.",
-						"Nothing fires while a snapshot is arriving, so a server joining does not "
-								+ "replay the whole map as changes.")
-				.examples(
-						"on network variable change of \"inbox::*\":",
-						"\tset {_uuid} to the second element of the changed variable split at \"::\"",
-						"\tif player with uuid {_uuid} is online:",
-						"\t\tsend the new value to player with uuid {_uuid}")
+				.description("""
+						Fires on every server the moment a network variable changes, including the one that wrote it.
+						Give it a name to listen to one branch instead of every write on the network. A `*` is a wildcard, the same as `/sknetproxy dump`.
+						That name is the stored key, not a variable name, so a `%player%` written inside it is never filled in. Match the branch with `*` and read `the changed variable` to find out who it was.
+						Nothing fires while a snapshot is arriving, so a server joining does not replay the whole map as changes.
+						Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
+						""")
+				.examples("""
+						on network variable change of "inbox::*":
+							set {_who} to the last element of (the changed variable split at "::")
+							set {_player} to {_who} parsed as offline player
+							if {_player} is online:
+								send the new value to {_player}
+						""")
 				.since("0.2.0");
 	}
 }

@@ -17,18 +17,17 @@ import sknetwork.spigot.elements.types.AtomicResult;
 import sknetwork.spigot.elements.types.LastAtomic;
 
 @Name("Atomic Change Outcome")
-@Description({
-		"Checks what the proxy did with the last `atomically ... and wait` in this trigger.",
-		"There are three answers, not two. The proxy took the change, the proxy refused it, or the "
-				+ "proxy never replied.",
-		"Only a refusal proves the change did not happen. When no reply comes back, the proxy may "
-				+ "have applied the change and lost the answer, so treat that as unknown.",
-		"`failed` covers a refusal and a timeout together. Use it only where you would handle both "
-				+ "the same way.",
-		"A trigger that never waited has no answer, so all of these are false."
-})
+@Description("""
+		Checks what the proxy did with the last `atomically ... and wait` in this trigger.
+		There are three answers, not two. The proxy took the change, the proxy refused it, or the proxy never replied.
+		Only a refusal proves the change did not happen. When no reply comes back, the proxy may have applied the change and lost the answer, so treat that as unknown.
+		`failed` covers a refusal and a timeout together. Use it only where you would handle both the same way.
+		A trigger that never waited has no answer, so all of these are false.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes
+		""")
 @Example("""
-		atomically remove 100 from {?coins::%uuid of player%} without going below 0 and wait
+		atomically remove 100 from {?coins::%player%} without going below 0 and wait
 		if the atomic change succeeded:
 			send "Bought. You have %the atomic result% left."
 		else if the atomic change timed out:

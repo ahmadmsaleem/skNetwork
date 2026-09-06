@@ -8,10 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Which servers a folder name reaches. A group entry ending in '/' names another
- * group instead of a server, so one file can reach two sets without duplicating.
- */
 public final class ServerGroups {
 
 	/** Reaches every connected server and cannot be redefined. */

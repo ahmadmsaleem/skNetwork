@@ -37,12 +37,6 @@ import sknetwork.proxy.core.ProxyBoot;
 import sknetwork.proxy.core.ProxySettings;
 import sknetwork.proxy.core.SknetConsole;
 
-/**
- * The proxy half on Velocity. Same config file, same data, same protocol as
- * {@link SkNetworkBungee} - the shared work is in {@code ProxyBoot} and
- * {@code SknetConsole}, and this class only reads a config and registers a
- * command.
- */
 public final class SkNetworkVelocity {
 
 	/** Velocity speaks Adventure, so the shared legacy strings are converted here. */

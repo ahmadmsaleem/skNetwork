@@ -30,11 +30,6 @@ import sknetwork.common.RemoteServer;
 import sknetwork.common.VariableEntry;
 import sknetwork.common.VariableName;
 
-/**
- * The proxy half's core. No BungeeCord imports, so Velocity can reuse it.
- * One writer thread is the only thing that touches the store. That is what puts
- * every write in a total order. Do not make it concurrent.
- */
 public final class NetworkServer {
 
 	private static final int SNAPSHOT_CHUNK = 500;

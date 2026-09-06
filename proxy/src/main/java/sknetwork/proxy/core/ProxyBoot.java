@@ -5,14 +5,7 @@ import java.io.IOException;
 
 import sknetwork.common.Log;
 
-/**
- * Turns settings into a running proxy half. Both platform classes call this, so
- * BungeeCord and Velocity boot identically and only differ in how they read a
- * config file and register a command.
- */
 public final class ProxyBoot {
-
-
 	/**
 	 * @return the started server
 	 * @throws IOException if the socket cannot be bound, in which case nothing is running

@@ -13,9 +13,6 @@ import ch.njol.skript.log.LogEntry;
 import ch.njol.skript.log.RetainingLogHandler;
 import org.skriptlang.skript.lang.script.Script;
 
-/**
- * Loading and unloading pushed scripts, and catching what Skript says about them.
- */
 final class SkriptScripts {
 
 
@@ -23,8 +20,8 @@ final class SkriptScripts {
 	 * One thing Skript complained about while loading.
 	 *
 	 * @param severe whether it stopped something loading, as opposed to a style
-	 *               warning that did not. Reporting the two the same way sends an
-	 *               admin hunting for a broken script that loaded perfectly well.
+	 * warning that did not. Reporting the two the same way sends an
+	 * admin hunting for a broken script that loaded perfectly well.
 	 */
 	record LoadProblem(String path, int line, String message, boolean severe) {
 	}
@@ -40,13 +37,6 @@ final class SkriptScripts {
 		}
 	}
 
-	/**
-	 * Unloads everything currently loaded from under {@code root}, then loads the
-	 * whole directory again in one call so scripts can call each other's functions.
-	 *
-	 * <p>Call on the main thread. From there Skript queues the work onto its own
-	 * loader thread; from anywhere else it runs synchronously on the caller.
-	 */
 	static LoadReport reload(File root) {
 		unloadUnder(root);
 
@@ -61,7 +51,6 @@ final class SkriptScripts {
 		}
 	}
 
-	/** Skript throws if asked to unload something it does not have loaded. */
 	static void unloadUnder(File root) {
 		Set<Script> ours = new HashSet<>();
 		for (Script script : ScriptLoader.getLoadedScripts()) {

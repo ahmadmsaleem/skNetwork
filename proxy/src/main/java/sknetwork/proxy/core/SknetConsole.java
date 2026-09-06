@@ -7,10 +7,6 @@ import java.util.function.Consumer;
 import sknetwork.common.Protocol;
 import sknetwork.common.Style;
 
-/**
- * The body of {@code /sknetproxy} on the proxy, so BungeeCord and Velocity print the
- * same thing. Each platform only has to hand over a way to send a line back.
- */
 public final class SknetConsole {
 
 	private static final int DUMP_LIMIT = 40;

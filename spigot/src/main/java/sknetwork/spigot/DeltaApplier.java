@@ -20,10 +20,6 @@ import sknetwork.spigot.elements.types.AtomicResult;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-/**
- * Drains frames onto the main thread, capped per tick so a large snapshot
- * spreads over several ticks instead of freezing the server.
- */
 final class DeltaApplier extends BukkitRunnable {
 
 	private static final int PER_TICK = 2_000;
@@ -31,27 +27,12 @@ final class DeltaApplier extends BukkitRunnable {
 	private final SkNetworkSpigot plugin;
 	private final Queue<Frame> inbound;
 
-	/**
-	 * Every network variable this server thinks exists. A snapshot only ever adds,
-	 * so without this a key deleted while we were away would stay here forever.
-	 */
 	private final Set<String> mirrored = new HashSet<>();
 
-	/**
-	 * Writes the proxy never took, because this server was not synced at the time.
-	 * Skript put them in its own map anyway, so they disagree with the network
-	 * until a full snapshot puts them right.
-	 */
 	private final Set<String> unsynced = ConcurrentHashMap.newKeySet();
 
-	/** Set by {@code /sknet resync}: pull everything rather than resume. */
 	private volatile boolean forceFull;
 
-	/**
-	 * Set by the client when a session ends. A snapshot cut off halfway leaves
-	 * {@link #arriving} holding names from it, and the next snapshot would then
-	 * never drop the ones deleted in between.
-	 */
 	private volatile boolean sessionEnded;
 
 	private Set<String> arriving;
@@ -86,12 +67,10 @@ final class DeltaApplier extends BukkitRunnable {
 		forceFull = true;
 	}
 
-	/** Called off the main thread; the reset itself happens on the next tick. */
 	void sessionEnded() {
 		sessionEnded = true;
 	}
 
-	/** Whether a resume would leave this server holding values the network refused. */
 	boolean needsFullSnapshot() {
 		return forceFull || !unsynced.isEmpty();
 	}
@@ -101,8 +80,6 @@ final class DeltaApplier extends BukkitRunnable {
 		int budget = PER_TICK;
 
 		if (sessionEnded) {
-			// the dead session's frames were cleared with it, so what follows is a
-			// fresh sync and must not inherit half a snapshot
 			sessionEnded = false;
 			arriving = null;
 			snapshotEntries = 0;
@@ -125,7 +102,6 @@ final class DeltaApplier extends BukkitRunnable {
 			}
 		}
 
-		// after the drain, so a reply that arrived this tick is never counted late
 		plugin.requests().sweep(plugin.isSynced());
 	}
 
@@ -177,8 +153,6 @@ final class DeltaApplier extends BukkitRunnable {
 				String wasType = packet.nullableString();
 				byte[] wasValue = packet.nullableBytes();
 
-				// advance even when it could not be applied. asking again on the next
-				// reconnect would fail the same way.
 				try {
 					previous = wasValue == null ? null : SkriptBridge.read(wasType, wasValue);
 					apply(mode, name, type, value);
@@ -269,12 +243,7 @@ final class DeltaApplier extends BukkitRunnable {
 		}
 	}
 
-	/**
-	 * Deletes anything we hold that the snapshot did not mention, which is what
-	 * this server missed while away.
-	 *
-	 * @return how many were dropped
-	 */
+	/** @return how many were dropped */
 	private int reconcile() {
 		// a refused write is not in the mirror, so without this the key survives the
 		// snapshot and this server keeps a value nobody else has

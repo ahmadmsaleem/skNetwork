@@ -47,11 +47,11 @@ public final class Style {
 	private static final java.util.regex.Pattern HEX_PATTERN =
 			java.util.regex.Pattern.compile("§x(?:§[0-9a-fA-F]){6}");
 
-	/** {@code skNetwork 0.0.1 · protocol 6}, with the wordmark split like the logo. */
+	/** {@code skNetwork 0.0.1 - protocol 6}, with the wordmark split like the logo. */
 	public static String header(String version, int protocol) {
 		return VALUE + BOLD + "sk" + BRAND + BOLD + "Network" + RESET
 				+ MUTED + "  │  " + LABEL + version
-				+ MUTED + "  ·  " + LABEL + "protocol " + VALUE + protocol;
+				+ MUTED + "  -  " + LABEL + "protocol " + VALUE + protocol;
 	}
 
 	/** A blank line inside the block, so it still shows the edge. */

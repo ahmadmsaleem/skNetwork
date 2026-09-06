@@ -14,6 +14,9 @@ send "You have %{?coins::%player%}% coins"
 Any variable starting with `?` is a network variable. Reads come from this
 server's own copy, so only writes go over the wire.
 
+**[Read the wiki](https://github.com/ahmadmsaleem/skNetwork/wiki)** for setup, guides,
+the full syntax reference and copyable example scripts.
+
 ---
 
 ## Features

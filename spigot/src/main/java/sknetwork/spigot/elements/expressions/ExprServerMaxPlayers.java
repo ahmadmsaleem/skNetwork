@@ -17,7 +17,11 @@ import sknetwork.common.RemoteServer;
 import sknetwork.spigot.SkNetworkSpigot;
 
 @Name("Network Server Max Players")
-@Description("How many players a server on the network will let in.")
+@Description("""
+		How many players a server on the network will let in.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
+		""")
 @Example("""
 		if size of network players on "lobby" >= max player count of network server "lobby":
 			send "&cThe lobby is full."

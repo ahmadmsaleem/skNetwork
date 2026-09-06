@@ -7,10 +7,6 @@ import java.util.Map;
 import sknetwork.common.Durations;
 import sknetwork.common.Protocol;
 
-/**
- * Everything the proxy half reads out of config.yml. One place, so BungeeCord and
- * Velocity cannot end up with different defaults.
- */
 public record ProxySettings(String bind, int port, String token, boolean debug,
 		String logName, long flushIntervalMs, double compactRatio, int replayBuffer,
 		boolean scriptsEnabled, Map<String, List<String>> groups,

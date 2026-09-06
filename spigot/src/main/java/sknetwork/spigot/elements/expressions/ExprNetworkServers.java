@@ -18,11 +18,12 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.SkNetworkSpigot;
 
 @Name("Network Servers")
-@Description({
-		"Every server currently connected to the proxy, by name.",
-		"Read from this server's own copy, so it costs nothing. A server that has lost the proxy "
-				+ "reports an empty list rather than a stale one."
-})
+@Description("""
+		Every server currently connected to the proxy, by name.
+		Read from this server's own copy, so it costs nothing. A server that has lost the proxy reports an empty list rather than a stale one.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
+		""")
 @Example("""
 		command /servers:
 			trigger:

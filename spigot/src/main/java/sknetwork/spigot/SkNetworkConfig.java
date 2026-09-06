@@ -15,6 +15,7 @@ final class SkNetworkConfig {
 	private final String prefix;
 	private final boolean forceSkriptConfig;
 	private final boolean displayValues;
+	private final boolean checkForUpdates;
 	private final long atomicTimeoutMs;
 
 	SkNetworkConfig(FileConfiguration config, int serverPort) {
@@ -24,6 +25,7 @@ final class SkNetworkConfig {
 		this.prefix = config.getString("prefix", SkNetwork.DEFAULT_PREFIX);
 		this.forceSkriptConfig = config.getBoolean("force-skript-config", true);
 		this.displayValues = config.getBoolean("display-values", true);
+		this.checkForUpdates = config.getBoolean("check-for-updates", true);
 		this.atomicTimeoutMs = Durations.millis(config.getString("atomic-timeout"), 5_000);
 
 		String name = config.getString("server-name", "");
@@ -57,6 +59,11 @@ final class SkNetworkConfig {
 	/** Whether writes carry a readable copy of the value for the proxy's /sknet dump. */
 	boolean displayValues() {
 		return displayValues;
+	}
+
+	/** Whether to ask GitHub at startup if there is a newer skNetwork. */
+	boolean checkForUpdates() {
+		return checkForUpdates;
 	}
 
 	/** How long 'and wait' parks a trigger before giving up on the proxy. */

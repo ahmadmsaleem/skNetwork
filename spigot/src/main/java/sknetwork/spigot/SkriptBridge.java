@@ -42,22 +42,10 @@ public final class SkriptBridge {
 		return VARIABLE_LOADED != null;
 	}
 
-	/**
-	 * Skript lowercases every name a script reads or writes, unless 'case-insensitive
-	 * variables' is off in its config, but leaves a name handed to it by a storage
-	 * alone. So anything that puts a name into Skript's map, sends one on a script's
-	 * behalf, or compares one against a script's has to apply the same rule, or the
-	 * two spellings never meet: the value sits in the map under {?coins::Notch} and
-	 * every script asks for {?coins::notch}.
-	 */
 	public static String normalize(String name) {
 		return Variables.caseInsensitiveVariables ? name.toLowerCase(Locale.ENGLISH) : name;
 	}
 
-	/**
-	 * @param name the local Skript name, prefix included
-	 * @return false if the value would not deserialise on this server
-	 */
 	static boolean applySet(String name, String type, byte[] value, VariablesStorage source) {
 		if (source == null)
 			return false;
@@ -127,7 +115,6 @@ public final class SkriptBridge {
 		}
 	}
 
-	/** @return true if this write is our own delta coming back and must not be sent. */
 	static boolean isEcho(String name, byte[] value) {
 		if (value == null)
 			return pendingDeletes.remove(name);

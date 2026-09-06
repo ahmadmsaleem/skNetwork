@@ -22,6 +22,7 @@ import sknetwork.spigot.elements.events.NetworkSyncEvent;
 import sknetwork.spigot.elements.types.AtomicChange;
 import sknetwork.spigot.elements.types.AtomicResult;
 import sknetwork.spigot.modules.NetworkModule;
+import sknetwork.spigot.update.UpdateChecker;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -51,12 +52,6 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		return instance;
 	}
 
-	/**
-	 * Registration must happen here, not in onEnable. Skript builds its storage list
-	 * inside {@code Variables.load()} during its own onEnable, and every plugin's
-	 * onLoad runs before that. {@code depend: [Skript]} is what makes Skript's
-	 * classes available this early.
-	 */
 	@Override
 	public void onLoad() {
 		instance = this;
@@ -108,6 +103,8 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		client.start();
 
 		startMetrics();
+		if (config.checkForUpdates())
+			UpdateChecker.enable(this);
 		getCommand("sknet").setExecutor(new SknetCommand(this));
 		Skript.instance().registerAddon(SkNetworkSpigot.class, "skNetwork")
 				.loadModules(new NetworkModule());

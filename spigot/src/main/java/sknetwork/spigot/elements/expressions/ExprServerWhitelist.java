@@ -17,13 +17,15 @@ import sknetwork.common.RemoteServer;
 import sknetwork.spigot.SkNetworkSpigot;
 
 @Name("Network Server Whitelist")
-@Description({
-		"The names on another server's whitelist.",
-		"That server reports its own, so this is the list it will actually enforce, not a copy "
-				+ "kept somewhere else."
-})
+@Description("""
+		The names on another server's whitelist.
+		That server reports its own, so this is the list it will actually enforce, not a copy kept somewhere else.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
+		""")
 @Example("""
-		if "%player%" is not "whitelisted players of network server \\"survival\\"":
+		set {_allowed::*} to whitelisted players of network server "survival"
+		if "%player%" is not {_allowed::*}:
 			send "&cYou are not whitelisted on survival."
 		""")
 @Since("0.2.0")
