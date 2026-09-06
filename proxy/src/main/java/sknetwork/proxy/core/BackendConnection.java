@@ -33,6 +33,7 @@ final class BackendConnection {
 
 	private final String address;
 	private volatile String name;
+	private volatile boolean usePlayerUuids;
 	private volatile boolean ready;
 	private volatile long lastSeq;
 	private volatile long manifestVersion;
@@ -44,6 +45,10 @@ final class BackendConnection {
 		this.socket = socket;
 		this.address = String.valueOf(socket.getRemoteSocketAddress());
 		this.name = address;
+	}
+
+	boolean usePlayerUuids() {
+		return usePlayerUuids;
 	}
 
 	String name() {
@@ -124,6 +129,7 @@ final class BackendConnection {
 		String skriptVersion = packet.string();
 		long lastSeq = packet.int64();
 		long manifestVersion = packet.int64();
+		boolean playerUuids = packet.bool();
 
 		this.name = serverName;
 
@@ -138,6 +144,10 @@ final class BackendConnection {
 					+ "against 'token' in the proxy's");
 			return false;
 		}
+
+		// only reported, never refused: a backend keying players the other way still
+		// works, it just quietly keeps its own copy of every player-keyed variable
+		this.usePlayerUuids = playerUuids;
 
 		server.log().info(serverName + " connected (Skript " + skriptVersion
 				+ ", lastSeq " + lastSeq + ")");

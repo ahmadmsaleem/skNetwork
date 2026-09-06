@@ -21,8 +21,11 @@ import sknetwork.common.ScriptPath;
 final class ScriptSync {
 
 
-	private static final String FOLDER = "network";
-	private static final String STAGING = "network.staging";
+	private static final String FOLDER = "skNetwork";
+	private static final String STAGING = "skNetwork.staging";
+
+	/** Where these landed up to 0.3.0. */
+	private static final String OLD_FOLDER = "network";
 
 	private final SkNetworkSpigot plugin;
 	private final File root;
@@ -38,6 +41,32 @@ final class ScriptSync {
 		this.plugin = plugin;
 		this.root = new File(scriptsFolder, FOLDER);
 		this.staging = new File(scriptsFolder, STAGING);
+		migrateOldFolder(scriptsFolder);
+	}
+
+	/**
+	 * Scripts used to land in scripts/network/. Left there they keep loading while
+	 * nothing pushes to them any more, so a server would run whatever it happened to
+	 * hold the day it was updated.
+	 */
+	private void migrateOldFolder(File scriptsFolder) {
+		File old = new File(scriptsFolder, OLD_FOLDER);
+		if (!old.isDirectory())
+			return;
+
+		if (root.exists()) {
+			plugin.getLogger().warning("plugins/Skript/scripts/ has both " + OLD_FOLDER + "/ and "
+					+ FOLDER + "/. The old one is not pushed to any more, but Skript still loads "
+					+ "it - delete " + OLD_FOLDER + "/ once you have checked nothing there is "
+					+ "worth keeping.");
+			return;
+		}
+		if (old.renameTo(root))
+			plugin.getLogger().info("moved pushed scripts from plugins/Skript/scripts/"
+					+ OLD_FOLDER + "/ to " + FOLDER + "/");
+		else
+			plugin.getLogger().warning("could not move " + old + " to " + root
+					+ ". Move it by hand, or delete it: nothing pushes to it any more.");
 	}
 
 	File root() {

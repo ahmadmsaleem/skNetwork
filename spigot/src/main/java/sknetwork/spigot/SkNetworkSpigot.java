@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import ch.njol.skript.Skript;
+import ch.njol.skript.SkriptConfig;
 import ch.njol.skript.util.Version;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
@@ -140,6 +141,15 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 			requests.sweep(false);
 	}
 
+	/**
+	 * Skript's 'use player UUIDs in variable names'. It decides whether
+	 * {@code {?coins::%player%}} is keyed by UUID or by name, so two backends that
+	 * disagree write the same player to two different keys and neither sees the other.
+	 */
+	public boolean usePlayerUuids() {
+		return SkriptConfig.usePlayerUUIDsInVariableNames.value();
+	}
+
 	@Override
 	public String serverName() {
 		return config.serverName();
@@ -228,7 +238,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	}
 
 	/**
-	 * How a value reads, for {@code /sknet dump}. Costs one deserialise on Skript's
+	 * How a value reads, for {@code /sknetproxy dump}. Costs one deserialise on Skript's
 	 * write thread, which is why it is a config option.
 	 *
 	 * @return null when there is nothing to show
@@ -328,8 +338,8 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		if (held == 0)
 			return;
 		getLogger().info("holding " + held + " script(s) pushed by the proxy, in "
-				+ "plugins/Skript/scripts/network/. They keep running even if the proxy stops "
-				+ "pushing - delete that folder to be rid of them.");
+				+ "plugins/Skript/scripts/skNetwork/. Turning script distribution off on the "
+				+ "proxy clears them from here on the next connect.");
 	}
 
 	private void reportStorageState() {

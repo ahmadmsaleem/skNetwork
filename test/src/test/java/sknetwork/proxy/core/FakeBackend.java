@@ -41,6 +41,11 @@ final class FakeBackend implements AutoCloseable {
 
 	FakeBackend(String name, int port, String token, int protocol, long lastSeq, long manifestVersion)
 			throws IOException {
+		this(name, port, token, protocol, lastSeq, manifestVersion, true);
+	}
+
+	FakeBackend(String name, int port, String token, int protocol, long lastSeq,
+			long manifestVersion, boolean usePlayerUuids) throws IOException {
 		this.name = name;
 		this.socket = new Socket();
 		socket.connect(new InetSocketAddress("127.0.0.1", port), (int) TIMEOUT_MS);
@@ -56,6 +61,7 @@ final class FakeBackend implements AutoCloseable {
 				.string("2.16.2")
 				.int64(lastSeq)
 				.int64(manifestVersion)
+				.bool(usePlayerUuids)
 				.frame()
 				.write(out);
 	}

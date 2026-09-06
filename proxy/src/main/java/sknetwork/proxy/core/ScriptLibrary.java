@@ -204,10 +204,13 @@ public final class ScriptLibrary {
 					  global/    every connected server
 					  <name>/    the servers listed under 'scripts.groups.<name>' in config.yml
 
-					Backends receive these in plugins/Skript/scripts/network/ and must not be
+					Backends receive these in plugins/Skript/scripts/skNetwork/ and must not be
 					edited there - the next push overwrites them. Edit here instead.
 
-					Push with /sknet push on the proxy console.
+					Nothing leaves this folder until 'scripts.enabled' is true in config.yml.
+					With it on, push with /sknetproxy push on the proxy console.
+
+					Anyone who can write here can run code on every backend.
 					""", StandardCharsets.UTF_8);
 		} catch (IOException e) {
 			log.warn("could not write the scripts README: " + e.getMessage());

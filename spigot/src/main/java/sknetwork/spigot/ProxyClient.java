@@ -300,6 +300,7 @@ final class ProxyClient {
 				.string(plugin.skriptVersion())
 				.int64(resumeFrom)
 				.int64(plugin.manifestVersion())
+				.bool(plugin.usePlayerUuids())
 				.frame()
 				.write(out);
 

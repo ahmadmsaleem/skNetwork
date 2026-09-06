@@ -84,19 +84,29 @@ public final class NetworkServer {
 	private volatile long backlogLimit = DEFAULT_BACKLOG_BYTES;
 	private volatile boolean players = true;
 	private volatile boolean remoteCommands;
+	private volatile boolean usePlayerUuids = true;
 
 	private record Replayable(long seq, Frame frame) {
 	}
 
 	public NetworkServer(String bindHost, int port, String token, File logFile,
 			long flushIntervalMs, double compactRatio, int replayCapacity, Log log) {
+		this(bindHost, port, token, logFile, flushIntervalMs, compactRatio,
+				NamePatterns.none(), replayCapacity, log);
+	}
+
+	public NetworkServer(String bindHost, int port, String token, File logFile,
+			long flushIntervalMs, double compactRatio, NamePatterns noPersist,
+			int replayCapacity, Log log) {
 		this.bindHost = bindHost;
 		this.port = port;
 		this.token = token;
 		this.log = log;
 		this.flushIntervalMs = flushIntervalMs;
 		this.replayCapacity = Math.max(replayCapacity, 0);
-		this.changeLog = logFile == null ? new NoopChangeLog() : new CsvChangeLog(logFile, compactRatio, log);
+		this.changeLog = logFile == null
+				? new NoopChangeLog()
+				: new CsvChangeLog(logFile, compactRatio, noPersist, log);
 	}
 
 	public Log log() {
@@ -127,6 +137,15 @@ public final class NetworkServer {
 
 	void backlogLimit(long bytes) {
 		backlogLimit = bytes;
+	}
+
+	/** What Skript's 'use player UUIDs in variable names' should be on every backend. */
+	public void usePlayerUuids(boolean usePlayerUuids) {
+		this.usePlayerUuids = usePlayerUuids;
+	}
+
+	boolean usePlayerUuids() {
+		return usePlayerUuids;
 	}
 
 	public boolean remoteCommandsEnabled() {
@@ -229,6 +248,7 @@ public final class NetworkServer {
 
 	void register(BackendConnection connection) {
 		warnIfNameTaken(connection);
+		warnIfPlayerKeysDiffer(connection);
 		connections.add(connection);
 	}
 
@@ -251,6 +271,25 @@ public final class NetworkServer {
 					+ "its own 'server-name' in config.yml.");
 			return;
 		}
+	}
+
+	/**
+	 * Skript keys {@code {?coins::%player%}} by UUID or by name depending on its own
+	 * config, and the name it hands us is already flattened to text, so the two cannot
+	 * be told apart afterwards. Backends that disagree write one player to two keys and
+	 * quietly stop seeing each other. Say so while it is still a line in a log.
+	 */
+	private void warnIfPlayerKeysDiffer(BackendConnection joining) {
+		if (joining.usePlayerUuids() == usePlayerUuids)
+			return;
+
+		log.warn(joining.name() + " has 'use player UUIDs in variable names' set to "
+				+ joining.usePlayerUuids() + " in its Skript config, but this proxy expects "
+				+ usePlayerUuids + ". A variable like {?coins::%player%} is a different key under "
+				+ "each spelling, so the same player ends up with two of everything and neither "
+				+ "server sees the other's writes. Set Skript's option the same way on every "
+				+ "backend, or change it in this proxy's config to match them. Skript does not "
+				+ "rename variables that already exist under the other spelling.");
 	}
 
 	void unregister(BackendConnection connection) {
@@ -535,10 +574,12 @@ public final class NetworkServer {
 
 	private void pushTo(BackendConnection target) {
 		ScriptLibrary library = scripts;
-		if (library == null)
-			return;
-
-		Manifest manifest = library.manifestFor(target.name());
+		// no library means distribution is off. A backend still holding what it was
+		// pushed while it was on has to be told to drop it, or it runs those scripts
+		// for as long as nobody notices the folder.
+		Manifest manifest = library == null
+				? new Manifest(Manifest.NO_VERSION, List.of())
+				: library.manifestFor(target.name());
 		if (target.manifestVersion() == manifest.version() && manifest.version() != 0)
 			return;
 		target.sendManifest(manifest);

@@ -56,7 +56,7 @@ final class SkNetworkConfig {
 		return forceSkriptConfig;
 	}
 
-	/** Whether writes carry a readable copy of the value for the proxy's /sknet dump. */
+	/** Whether writes carry a readable copy of the value for the proxy's /sknetproxy dump. */
 	boolean displayValues() {
 		return displayValues;
 	}

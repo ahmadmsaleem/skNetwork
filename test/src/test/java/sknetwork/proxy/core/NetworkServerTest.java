@@ -74,6 +74,44 @@ class NetworkServerTest {
 	}
 
 	@Test
+	void warnsAboutABackendKeyingPlayersTheOtherWay() throws IOException {
+		server.usePlayerUuids(true);
+
+		connectWithPlayerUuids("survival", false).sync();
+
+		awaitWarning("use player UUIDs in variable names");
+	}
+
+	/** Naming the odd one out is the whole point, so the message has to carry it. */
+	@Test
+	void namesTheBackendThatDisagrees() throws IOException {
+		server.usePlayerUuids(true);
+
+		connectWithPlayerUuids("survival", false).sync();
+
+		awaitWarning("survival has 'use player UUIDs in variable names' set to false");
+	}
+
+	/** A mismatch is worth saying out loud, but it is not worth refusing the backend. */
+	@Test
+	void stillAcceptsABackendKeyingPlayersTheOtherWay() throws IOException {
+		server.usePlayerUuids(true);
+
+		FakeBackend survival = connectWithPlayerUuids("survival", false);
+
+		assertEquals(0, survival.sync().seq());
+	}
+
+	@Test
+	void staysQuietWhenABackendAgreesWithTheProxy() throws IOException {
+		server.usePlayerUuids(false);
+
+		connectWithPlayerUuids("lobby", false).sync();
+
+		assertFalse(log.sawWarning("use player UUIDs in variable names"));
+	}
+
+	@Test
 	void rejectsAnythingThatIsNotAHandshake() throws IOException {
 		try (Socket rude = new Socket("127.0.0.1", port)) {
 			rude.setSoTimeout(5_000);
@@ -711,6 +749,13 @@ class NetworkServerTest {
 	private FakeBackend synced(String name) throws IOException {
 		FakeBackend backend = connected(name);
 		backend.sync();
+		return backend;
+	}
+
+	private FakeBackend connectWithPlayerUuids(String name, boolean usePlayerUuids)
+			throws IOException {
+		FakeBackend backend = new FakeBackend(name, port, TOKEN, Protocol.VERSION, 0, 0, usePlayerUuids);
+		backends.add(backend);
 		return backend;
 	}
 

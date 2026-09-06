@@ -90,14 +90,9 @@ jobs:
 
                       ## Install
 
-                      The jar is attached below. It goes in `plugins/` on the proxy
-                      **and** on every game server: one jar, it works out which half to
-                      be. Restart the network, then check `/sknetproxy` on the proxy and
-                      `/sknet` on a backend both say `READY`.
+                      The jar is attached below. It goes in `plugins/` on the proxy **and** on every game server: one jar, it works out which half to be. Restart the network, then check `/sknetproxy` on the proxy and `/sknet` on a backend both say `READY`.
 
-                      Every server has to run the same build. A half that is behind is
-                      refused when it connects, with a message on both consoles saying
-                      which side to update.
+                      Every server has to run the same build. A half that is behind is refused when it connects, with a message on both consoles saying which side to update.
 
                       Read more about the setup [here](https://github.com/ahmadmsaleem/skNetwork/wiki/Setup)
 
@@ -110,8 +105,5 @@ jobs:
                       | Skript | 2.16.0+ |
                       | Proxy | BungeeCord or Velocity |
 
-                      Java 25 is not optional, whatever Minecraft version you run: a 1.21
-                      server also has to be started with Java 25.
 
-                      Setup, guides and the full syntax reference are in the
-                      [wiki](https://github.com/ahmadmsaleem/skNetwork/wiki).
+                      Setup, guides and the full syntax reference are in the [wiki](https://github.com/ahmadmsaleem/skNetwork/wiki).

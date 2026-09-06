@@ -4,7 +4,7 @@ package sknetwork.common;
 public final class Protocol {
 
 	/** Bump this whenever a frame changes shape. Checked during HELLO. */
-	public static final int VERSION = 8;
+	public static final int VERSION = 9;
 
 
 	public static final int DEFAULT_PORT = 25580;

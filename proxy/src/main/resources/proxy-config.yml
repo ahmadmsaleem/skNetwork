@@ -1,29 +1,73 @@
 # skNetwork, proxy half.
 # This is the server that owns the data. Every backend mirrors what it holds.
+#
+# Every backend points at this proxy with 'proxy.host', 'proxy.port' and
+# 'proxy.token' in its own plugins/skNetwork/config.yml. Those three have to agree
+# with what is set here or the backend never gets past the handshake.
 
-# Loopback by default. Without the token, anyone who can reach this port can read
-# and write every network variable you have.
+# ─── Connection ───────────────────────────────────────────────────────────────
+
+# Which address to listen on. Loopback means only this machine can reach it, which
+# is right when the proxy and the backends are the same box. Put backends on other
+# machines and this has to be an address they can reach, at which point the token
+# below is the only thing standing between a stranger and every variable you have.
 bind: 127.0.0.1
+
+# Must match 'proxy.port' on every backend.
 port: 25580
+
+# Must match 'proxy.token' on every backend. Anyone who can reach the port and
+# knows this string can read and write every network variable, so change it before
+# you move 'bind' off loopback. Leaving it as change-me on a non-loopback bind is
+# called out on startup.
 token: "change-me"
 
-# Append-only change log, in the same CSV shape as Skript's variables.csv.
-# Set to "none" to keep nothing, in which case a proxy restart starts empty.
+# ─── Storage ──────────────────────────────────────────────────────────────────
+
+# Append-only change log, in the same CSV shape as Skript's variables.csv. It
+# lives in plugins/skNetwork/ next to this file.
+#
+# Set to "none" to keep nothing, in which case a proxy restart starts empty and
+# every backend is told to throw its copy away and pull the whole map again.
 log: network.csv
 
-# Buffer flush window. A hard crash loses at most this much.
+# How long writes may sit in memory before they reach the log. A hard crash loses
+# at most this much. Backends are told about a change immediately either way, so
+# this trades crash safety against disk writes, not speed.
 flush-interval: 100ms
 
-# Compact once the log holds more than this multiple of the live key count.
+# When to rewrite the log with only the values that are still live.
+#
+# The log appends, so a variable written a thousand times is a thousand lines but
+# one value. At 2.0 the file is compacted once it holds more than twice as many
+# lines as there are live keys. Lower compacts more often and keeps the file
+# small; higher leaves it alone at the cost of a slower startup read.
 compact-when: 2.0
 
-# How many recent changes to keep for reconnecting servers. A backend away longer
-# than this gets a full snapshot instead, which is slower but always correct.
+# Variables that are shared across the network but never written to the log.
+#
+# The log keeps a value until it is compacted away, and 'delete' only appends a
+# tombstone, so a value that has been deleted stays readable in network.csv, and
+# then in network.csv.bak, for up to two compactions. Both the hex field and the
+# readable one hold it, so turning 'display-values' off on the backends hides it
+# from '/sknetproxy dump' and from nothing else.
+#
+# Anything matched here skips all of that: it lives in memory, syncs to every
+# backend like any other network variable, and is gone when the proxy restarts.
+# That is the right home for session tokens, one-time codes and API keys.
+no-persist: []
+#  - "session::*"
+#  - "apikey"
+
+# How many recent changes to keep in memory for reconnecting servers. A backend
+# away longer than this gets a full snapshot instead, which is slower but always
+# correct. Raise it if backends restart often and the snapshots are large.
 replay-buffer: 10000
 
 # ─── Script distribution ──────────────────────────────────────────────────────
+
 # Scripts in plugins/skNetwork/scripts/<group>/ are pushed to backend servers,
-# which receive them in plugins/Skript/scripts/network/<group>/.
+# which receive them in plugins/Skript/scripts/skNetwork/<group>/.
 #
 # 'global' always means every connected server and cannot be redefined. Any other
 # folder name has to appear under 'groups' below or nothing in it is pushed.
@@ -31,11 +75,16 @@ replay-buffer: 10000
 # An entry ending in '/' names another group rather than a server, so one file
 # can reach two sets without being duplicated.
 #
-# Push with /sknet push on the proxy console.
+# Push with /sknetproxy push on the proxy console.
 #
 # Anyone who can write to the scripts folder can run code on every backend.
 scripts:
+  # Off means nothing is pushed and the folder is ignored entirely.
   enabled: false
+
+  # Which servers each folder goes to, matched against the 'server-name' each
+  # backend reports. Nothing checks these against reality, so a name that never
+  # connects is not an error; that folder simply never reaches anything.
   groups:
     hubs:
       - lobby
@@ -43,10 +92,17 @@ scripts:
     minigames:
       - bedwars1
       - bedwars2
+
+  # A file over this is skipped, with a line in the log naming it. The rest of the
+  # library is still pushed.
   max-file-kb: 512
+
+  # The scan stops once the library passes this, so whatever had not been read yet
+  # is left out rather than trimmed evenly. The log says where it stopped.
   max-total-mb: 16
 
 # ─── Player features ──────────────────────────────────────────────────────────
+
 # Messaging players anywhere on the network, moving them between servers, and
 # looking up who is online where.
 #
@@ -60,4 +116,23 @@ players: true
 # this is off unless you turn it on deliberately.
 remote-commands: false
 
+# ─── Variable names ───────────────────────────────────────────────────────────
+
+# What Skript's option of the same name should be on every backend.
+#
+# It decides whether {?coins::%player%} is stored as coins::<uuid> or
+# coins::<name>. The name reaches the proxy already flattened to text, so a
+# backend set the other way keeps its own separate copy of every player-keyed
+# variable and neither side sees the other's writes.
+#
+# Nothing is refused over this. A backend that disagrees is named in the proxy log
+# so you can fix it. Skript does not rename variables that already exist under the
+# other spelling, so changing it on a live network strands the old ones.
+use player UUIDs in variable names: true
+
+# ─── Troubleshooting ──────────────────────────────────────────────────────────
+
+# Logs every change as it is applied, with its sequence number and which backend
+# sent it, plus anything the proxy refused and why. Useful for working out why two
+# servers disagree; noisy enough that it is not for everyday running.
 debug: false

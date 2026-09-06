@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
 import sknetwork.common.VariableEntry;
@@ -49,7 +48,7 @@ final class VariableStore {
 	 *             a pattern without one has to match the name exactly
 	 */
 	List<Map.Entry<String, VariableEntry>> matching(String glob) {
-		Pattern pattern = compile(glob);
+		Pattern pattern = NamePatterns.compile(glob);
 		return variables.entrySet().stream()
 				.filter(entry -> pattern.matcher(entry.getKey()).matches())
 				.sorted(Map.Entry.comparingByKey())
@@ -57,23 +56,5 @@ final class VariableStore {
 	}
 
 
-	private static Pattern compile(String glob) {
-		StringBuilder regex = new StringBuilder();
-		int from = 0;
-		for (int star = glob.indexOf('*'); star >= 0; star = glob.indexOf('*', from)) {
-			if (star > from)
-				regex.append(Pattern.quote(glob.substring(from, star)));
-			regex.append(".*");
-			from = star + 1;
-		}
-		if (from < glob.length())
-			regex.append(Pattern.quote(glob.substring(from)));
-
-		try {
-			return Pattern.compile(regex.toString(), Pattern.DOTALL);
-		} catch (PatternSyntaxException e) {
-			return Pattern.compile(Pattern.quote(glob));
-		}
-	}
 
 }
