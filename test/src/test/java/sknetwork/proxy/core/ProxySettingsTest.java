@@ -24,7 +24,7 @@ class ProxySettingsTest {
 		assertEquals(100, settings.flushIntervalMs());
 		assertEquals(2.0, settings.compactRatio());
 		assertEquals(10_000, settings.replayBuffer());
-		assertFalse(settings.scriptsEnabled());
+		assertTrue(settings.scriptsEnabled());
 		assertEquals(512 * 1024L, settings.maxFileBytes());
 		assertEquals(16 * 1024 * 1024L, settings.maxTotalBytes());
 	}

@@ -80,7 +80,7 @@ replay-buffer: 10000
 # Anyone who can write to the scripts folder can run code on every backend.
 scripts:
   # Off means nothing is pushed and the folder is ignored entirely.
-  enabled: false
+  enabled: true
 
   # Which servers each folder goes to, matched against the 'server-name' each
   # backend reports. Nothing checks these against reality, so a name that never
