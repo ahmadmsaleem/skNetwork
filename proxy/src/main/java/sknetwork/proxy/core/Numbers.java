@@ -1,9 +1,5 @@
 package sknetwork.proxy.core;
 
-/**
- * Reads and writes the numeric types Skript stores, so the writer thread can do
- * arithmetic without any Skript classes on the proxy.
- */
 final class Numbers {
 
 	static boolean isNumeric(String type) {

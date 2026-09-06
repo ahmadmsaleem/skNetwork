@@ -28,7 +28,7 @@ import sknetwork.spigot.SkNetworkSpigot;
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")
 @Example("""
-		send network action bar "&cThe event starts in 10 seconds" to network players "Notch", "eult"
+		send network action bar "&cThe event starts in 10 seconds" to network players "Notch" and "eult"
 		""")
 @Since("0.2.0")
 public class EffNetworkActionBar extends Effect {

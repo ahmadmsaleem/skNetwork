@@ -11,10 +11,6 @@ import java.util.stream.Collectors;
 import sknetwork.common.VariableEntry;
 import sknetwork.common.VariableName;
 
-/**
- * The proxy's copy of every network variable. Only the writer thread mutates it;
- * the map is concurrent so size and snapshots can be read without locking.
- */
 final class VariableStore {
 
 

@@ -1,6 +1,5 @@
 package sknetwork.proxy.core;
 
-/** Keeps nothing, so a proxy restart starts empty. */
 final class NoopChangeLog implements ChangeLog {
 
 

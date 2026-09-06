@@ -2,6 +2,7 @@ package sknetwork.spigot;
 
 import java.util.Locale;
 
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import sknetwork.common.Protocol;
 import sknetwork.common.Style;
 import org.bukkit.command.Command;
@@ -11,6 +12,49 @@ import org.jetbrains.annotations.NotNull;
 
 /** {@code /sknet}. */
 final class SknetCommand implements CommandExecutor {
+
+	private static final String HELP_HEADER = """
+			This server's build, and the wire protocol it speaks.
+			The proxy and every backend have to agree on the number,
+			or the connection is refused at the handshake.""";
+
+	private static final String HELP_STATE = """
+			READY means writes are accepted.
+			In any other state a write to a network variable is refused,
+			though reads keep working from the mirror.""";
+
+	private static final String HELP_SERVER = """
+			The name this server goes by on the network.
+			It comes from server-name in config.yml, or
+			server-<port> when that is left blank.""";
+
+	private static final String HELP_PROXY = """
+			Where this server found the proxy, and how long a round
+			trip takes. The ping runs every five seconds.""";
+
+	private static final String HELP_STORAGE = """
+			The prefix that makes a variable a network variable, and
+			the pattern Skript matches it against. The pattern lives
+			in the skNetwork block of Skript's config.sk.""";
+
+	private static final String HELP_MIRROR = """
+			How many network variables this server holds, and how far
+			through the proxy's change log it has read.
+			Reads are answered from here, so they cost nothing.""";
+
+	private static final String HELP_APPLIED = """
+			Changes from the proxy that reached this server's map.
+			A dropped one carried a type this server cannot read,
+			usually because Skript or a plugin differs here.""";
+
+	private static final String HELP_REFUSED = """
+			Writes that never left this server, because it was not
+			synced yet or the name did not carry the prefix.""";
+
+	private static final String HELP_WAITING = """
+			Atomic changes still waiting on the proxy. Each one gives
+			up after the atomic-timeout in config.yml and comes back
+			to the script as refused.""";
 
 	private final SkNetworkSpigot plugin;
 
@@ -28,7 +72,7 @@ final class SknetCommand implements CommandExecutor {
 			case "reconnect" -> reconnect(sender);
 			case "" -> status(sender);
 			default -> {
-				sender.sendMessage(SknetStyle.header(version(), Protocol.VERSION));
+				header(sender);
 				sender.sendMessage(SknetStyle.gap());
 				sender.sendMessage(SknetStyle.note("no such subcommand '<name>'",
 						SknetStyle.text("name", args[0])));
@@ -76,56 +120,62 @@ final class SknetCommand implements CommandExecutor {
 		AtomicRequests requests = plugin.requests();
 		SyncState state = client == null ? SyncState.DISCONNECTED : client.state();
 
-		sender.sendMessage(SknetStyle.header(version(), Protocol.VERSION));
+		header(sender);
 		sender.sendMessage(SknetStyle.gap());
 
-		sender.sendMessage(SknetStyle.row("State",
+		row(sender, "State", HELP_STATE,
 				"<" + colour(state) + "><state>"
 						+ (state == SyncState.READY ? "" : "<gray>  writes are refused"),
-				SknetStyle.text("state", state.toString())));
+				SknetStyle.text("state", state.toString()));
 
-		sender.sendMessage(SknetStyle.row("Server", "<white><name>",
-				SknetStyle.text("name", plugin.serverName())));
+		row(sender, "Server", HELP_SERVER, "<white><name>",
+				SknetStyle.text("name", plugin.serverName()));
 
 		long latency = client == null ? -1 : client.latencyMs();
-		sender.sendMessage(SknetStyle.row("Proxy",
+		row(sender, "Proxy", HELP_PROXY,
 				"<white><target>" + (latency < 0 ? "" : "<dark_gray>  <ms>ms"),
 				SknetStyle.text("target", client == null ? "-" : client.describeTarget()),
-				SknetStyle.text("ms", Style.number(latency))));
+				SknetStyle.text("ms", Style.number(latency)));
 
-		sender.sendMessage(SkNetworkStorage.isConfigured()
-				? SknetStyle.row("Storage", "<white><prefix><dark_gray>  routing <pattern>",
-						SknetStyle.text("prefix", plugin.prefix()),
-						SknetStyle.text("pattern", SkNetworkStorage.pattern()))
-				: SknetStyle.row("Storage", "<red>NOT CONFIGURED"));
+		if (SkNetworkStorage.isConfigured())
+			row(sender, "Storage", HELP_STORAGE, "<white><prefix><dark_gray>  routing <pattern>",
+					SknetStyle.text("prefix", plugin.prefix()),
+					SknetStyle.text("pattern", SkNetworkStorage.pattern()));
+		else
+			row(sender, "Storage", HELP_STORAGE, "<red>NOT CONFIGURED");
 
-		sender.sendMessage(SknetStyle.row("Mirror",
-				"<white><count> <gray>variables<dark_gray>  seq <seq>",
+		row(sender, "Mirror", HELP_MIRROR, "<white><count> <gray>variables<dark_gray>  seq <seq>",
 				SknetStyle.text("count", Style.number(applier == null ? 0 : applier.mirroredCount())),
-				SknetStyle.text("seq", Style.number(client == null ? 0 : client.lastSeq()))));
+				SknetStyle.text("seq", Style.number(client == null ? 0 : client.lastSeq())));
 
 		long dropped = applier == null ? 0 : applier.dropped();
-		sender.sendMessage(SknetStyle.row("Applied",
+		row(sender, "Applied", HELP_APPLIED,
 				"<white><applied> <gray>inbound"
-						+ (dropped == 0 ? "" : "<dark_gray>  ·  <red><dropped> <gray>dropped"),
+						+ (dropped == 0 ? "" : "<dark_gray>  -  <red><dropped> <gray>dropped"),
 				SknetStyle.text("applied", Style.number(applier == null ? 0 : applier.applied())),
-				SknetStyle.text("dropped", Style.number(dropped))));
+				SknetStyle.text("dropped", Style.number(dropped)));
 
 		long refused = plugin.droppedWrites();
 		if (refused > 0)
-			sender.sendMessage(SknetStyle.row("Refused", "<red><count> <gray>outbound write(s)",
-					SknetStyle.text("count", Style.number(refused))));
+			row(sender, "Refused", HELP_REFUSED, "<red><count> <gray>outbound write(s)",
+					SknetStyle.text("count", Style.number(refused)));
 		if (requests != null && requests.pending() > 0)
-			sender.sendMessage(SknetStyle.row("Waiting",
-					"<yellow><count> <gray>atomic change(s) unanswered",
-					SknetStyle.text("count", Style.number(requests.pending()))));
-		if (client != null && client.lastError() != null)
-			sender.sendMessage(SknetStyle.row("Last error", "<red><error>",
-					SknetStyle.text("error", client.lastError())));
+			row(sender, "Waiting", HELP_WAITING, "<yellow><count> <gray>atomic change(s) unanswered",
+					SknetStyle.text("count", Style.number(requests.pending())));
 
 		sender.sendMessage(SknetStyle.gap());
 		usage(sender);
 		sender.sendMessage(SknetStyle.gap());
+	}
+
+	private void row(CommandSender sender, String label, String help, String value,
+			TagResolver... values) {
+		sender.sendMessage(SknetStyle.hover(SknetStyle.row(label, value, values), help));
+	}
+
+	private void header(CommandSender sender) {
+		sender.sendMessage(SknetStyle.hover(
+				SknetStyle.header(version(), Protocol.VERSION), HELP_HEADER));
 	}
 
 	private void usage(CommandSender sender) {

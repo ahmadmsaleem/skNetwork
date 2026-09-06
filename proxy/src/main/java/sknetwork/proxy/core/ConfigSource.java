@@ -2,13 +2,6 @@ package sknetwork.proxy.core;
 
 import java.util.List;
 
-/**
- * The little of a YAML file the proxy half needs, so the platform classes can
- * each use their own config library and the defaults still live in one place.
- * Paths are dotted, {@code scripts.enabled}, which is what BungeeCord's own
- * {@code Configuration} does. A key with a dot in it is therefore unreachable,
- * and always was.
- */
 public interface ConfigSource {
 
 	String string(String path, String fallback);

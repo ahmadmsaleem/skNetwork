@@ -19,6 +19,7 @@ import sknetwork.spigot.SkNetworkSpigot;
 @Description("""
 		Checks whether a server is connected to the proxy right now.
 		A server that is running but has not finished syncing does not count, because nothing sent to it would arrive yet.
+		
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")
 @Example("""

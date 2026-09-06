@@ -57,9 +57,10 @@ jobs:
             - name: Build the universal jar
               run: ./gradlew universalJar --no-daemon --console=plain
 
-            # Downloads go through Modrinth, so the jar is kept here only long
-            # enough for a maintainer to fetch it and upload it there.
-            - name: Keep the jar for the Modrinth upload
+            # The jar is attached to the release below as well. This copy is what a
+            # workflow_dispatch run leaves behind, for a maintainer to pick up without
+            # cutting a release.
+            - name: Keep the jar for a maintainer to collect
               uses: actions/upload-artifact@v6
               with:
                   name: skNetwork-jar
@@ -75,13 +76,42 @@ jobs:
                   generate_release_notes: true
                   draft: true
                   prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
+                  files: build/libs/skNetwork-*.jar
+                  fail_on_unmatched_files: true
                   body: |
-                      ## Download
+                      <!-- One or two lines: what this release is for. -->
 
-                      **[Get it on Modrinth](https://modrinth.com/project/sknetwork)**
+                      ## What's new
 
-                      One jar goes on the proxy and on every backend. Java 25 is required
-                      on both halves.
+                      -
 
-                      Setup and the full syntax reference are in the
+                      <!-- Protocol change? Say so here: it means every half has to be
+                           updated together, not just the backends. -->
+
+                      ## Install
+
+                      The jar is attached below. It goes in `plugins/` on the proxy
+                      **and** on every game server: one jar, it works out which half to
+                      be. Restart the network, then check `/sknetproxy` on the proxy and
+                      `/sknet` on a backend both say `READY`.
+
+                      Every server has to run the same build. A half that is behind is
+                      refused when it connects, with a message on both consoles saying
+                      which side to update.
+
+                      Read more about the setup [here](https://github.com/ahmadmsaleem/skNetwork/wiki/Setup)
+
+                      ## Requirements
+
+                      | | Needs |
+                      |---|---|
+                      | Java | **25**, on the proxy and on every backend |
+                      | Minecraft | 1.21 to 26.2 |
+                      | Skript | 2.16.0+ |
+                      | Proxy | BungeeCord or Velocity |
+
+                      Java 25 is not optional, whatever Minecraft version you run: a 1.21
+                      server also has to be started with Java 25.
+
+                      Setup, guides and the full syntax reference are in the
                       [wiki](https://github.com/ahmadmsaleem/skNetwork/wiki).

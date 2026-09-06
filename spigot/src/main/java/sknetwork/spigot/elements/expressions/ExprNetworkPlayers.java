@@ -29,7 +29,7 @@ import sknetwork.spigot.SkNetworkSpigot;
 		send "%size of all network players% online"
 		""")
 @Example("""
-		send "On the hubs: %network players on "lobby", "lobby2"%"
+		send "On the hubs: %network players on "lobby" and "lobby2"%"
 		""")
 @Since("0.2.0")
 public class ExprNetworkPlayers extends SimpleExpression<String> {

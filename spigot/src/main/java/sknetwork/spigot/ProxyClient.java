@@ -21,12 +21,6 @@ import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
 
-/**
- * The backend's connection to the proxy. A read thread that reconnects on its own,
- * plus a write thread so a stalled socket cannot block Skript's write thread.
- * Inbound frames wait on a queue and are applied on the main thread by
- * {@link DeltaApplier}, which is what Skript's serialisation needs.
- */
 final class ProxyClient {
 
 	private static final long RETRY_MIN_MS = 1_000;

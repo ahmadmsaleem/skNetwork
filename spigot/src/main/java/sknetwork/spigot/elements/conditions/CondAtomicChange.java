@@ -23,6 +23,7 @@ import sknetwork.spigot.elements.types.LastAtomic;
 		Only a refusal proves the change did not happen. When no reply comes back, the proxy may have applied the change and lost the answer, so treat that as unknown.
 		`failed` covers a refusal and a timeout together. Use it only where you would handle both the same way.
 		A trigger that never waited has no answer, so all of these are false.
+		
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes
 		""")
 @Example("""

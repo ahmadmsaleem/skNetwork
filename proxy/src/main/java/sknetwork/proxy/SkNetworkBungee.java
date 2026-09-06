@@ -32,12 +32,6 @@ import net.md_5.bungee.config.Configuration;
 import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
 
-/**
- * The proxy half, where the data actually lives.
- * Everything real is in {@link NetworkServer} and {@link ProxyBoot}, neither of
- * which has a BungeeCord import, so {@link SkNetworkVelocity} is this class
- * again against a different plugin API and nothing else.
- */
 public final class SkNetworkBungee extends Plugin {
 
 	private NetworkServer server;

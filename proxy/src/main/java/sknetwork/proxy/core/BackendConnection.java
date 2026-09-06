@@ -21,12 +21,6 @@ import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
 
-/**
- * One connected backend. A reader thread turns frames into queued mutations, a
- * writer thread drains the outbound queue.
- * That outbound queue is load bearing. Without it, a backend that stops reading
- * blocks the single writer thread and stalls the whole network.
- */
 final class BackendConnection {
 
 	private static final Frame POISON = new Frame((byte) 0, new byte[0]);

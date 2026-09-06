@@ -1,6 +1,5 @@
 package sknetwork.proxy.core;
 
-/** What the writer thread decided a mutation should do. */
 record Outcome(Kind kind, String type, byte[] value, String display, String error) {
 
 

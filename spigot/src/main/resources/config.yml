@@ -43,3 +43,9 @@ atomic-timeout: 5s
 # few bytes on the wire. Values over 64kB are sent without one either way. Turn it
 # off if this server writes constantly and nobody uses the proxy console.
 display-values: true
+
+# Ask GitHub once at startup whether a newer skNetwork has been released, and tell the
+# console and anyone with 'sknetwork.updates.view' when they join. Nothing is downloaded
+# and nothing about this server is sent. Turn it off and skNetwork never reaches the
+# network for anything but your own proxy.
+check-for-updates: true

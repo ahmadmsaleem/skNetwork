@@ -18,10 +18,6 @@ import sknetwork.common.PacketOut;
 import sknetwork.common.Protocol;
 import sknetwork.common.ScriptPath;
 
-/**
- * The backend's copy of the pushed scripts. Diffs a manifest against what is on
- * disk, asks for what is missing, and swaps the whole set in at once.
- */
 final class ScriptSync {
 
 

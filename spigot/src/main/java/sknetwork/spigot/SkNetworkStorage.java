@@ -8,20 +8,10 @@ import ch.njol.skript.variables.VariablesStorage;
 import org.jetbrains.annotations.Nullable;
 import sknetwork.common.MutationMode;
 
-/**
- * Skript's supported hook for putting variables somewhere other than disk.
- * Skript instantiates it reflectively through the {@code (String)} constructor,
- * so the plugin never holds the instance and the static handle stands in.
- */
 public final class SkNetworkStorage extends VariablesStorage {
 
 	private static volatile SkNetworkStorage instance;
 
-	/**
-	 * Skript builds this object before it parses the {@code pattern:} line, so the
-	 * instance existing proves nothing. It only calls {@code load_i} once the
-	 * pattern has compiled, and drops the storage entirely if it has not.
-	 */
 	private static volatile boolean accepted;
 
 	public SkNetworkStorage(String type) {
@@ -56,12 +46,6 @@ public final class SkNetworkStorage extends VariablesStorage {
 		return accepted && storage != null && storage.getNamePattern() == null;
 	}
 
-	/**
-	 * Whether Skript's pattern actually covers the prefix we were told to use.
-	 * When it does not, Skript accepts our writes but persists every inbound change
-	 * through the catch-all instead, which puts the whole network mirror in
-	 * variables.csv.
-	 */
 	public static boolean coversPrefix(String prefix) {
 		SkNetworkStorage storage = instance;
 		if (!accepted || storage == null)
@@ -102,19 +86,12 @@ public final class SkNetworkStorage extends VariablesStorage {
 	protected void disconnect() {
 	}
 
-	/**
-	 * Called on Skript's write thread. A null type and value mean a delete, which
-	 * is the proxy's contract too, so this passes straight through once the echo
-	 * check and the prefix are dealt with.
-	 */
 	@Override
 	protected boolean save(String name, @Nullable String type, byte @Nullable [] value) {
 		SkNetworkSpigot plugin = SkNetworkSpigot.get();
 		if (plugin == null)
 			return true;
 
-		// our own delta coming back around. dropping it here is what stops the
-		// set, save, broadcast, set loop
 		if (SkriptBridge.isEcho(name, value))
 			return true;
 

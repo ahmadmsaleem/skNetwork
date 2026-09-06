@@ -8,13 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Writes the {@code network} database block into Skript's config.sk so nobody
- * has to edit it by hand.
- * Only call this from {@code onLoad}. Skript reads config.sk during its own
- * {@code onEnable}, and every plugin's {@code onLoad} runs before that, which is
- * the only reason a file written here takes effect on the same startup.
- */
 final class SkriptConfigPatcher {
 
 
@@ -36,7 +29,6 @@ final class SkriptConfigPatcher {
 		this.prefix = prefix;
 	}
 
-	/** Extra context for the log line. */
 	String detail() {
 		return detail;
 	}
@@ -110,11 +102,6 @@ final class SkriptConfigPatcher {
 				"");
 	}
 
-	/**
-	 * Builds the regex Skript matches variable names against.
-	 * The result is never quoted. Skript hands the raw config value to
-	 * {@code Pattern.compile}, so quotes would end up inside the regex.
-	 */
 	static String patternFor(String prefix) {
 		if (prefix.length() == 1 && !Character.isLetterOrDigit(prefix.charAt(0)))
 			return "[" + prefix + "].*";
@@ -211,7 +198,6 @@ final class SkriptConfigPatcher {
 		return fallback;
 	}
 
-	/** Walks back over the blank and comment lines introducing a section, so they stay with it. */
 	private static int backUpOverComments(List<String> lines, int header, int sectionStart) {
 		int at = header;
 		while (at - 1 > sectionStart) {
@@ -224,7 +210,6 @@ final class SkriptConfigPatcher {
 		return at;
 	}
 
-	/** A direct child of 'databases:', meaning one indent and a trailing colon. */
 	private static boolean isHeader(String line, String indent) {
 		return line.startsWith(indent)
 				&& !line.startsWith(indent + indent)

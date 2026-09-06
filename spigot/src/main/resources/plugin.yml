@@ -20,3 +20,6 @@ permissions:
     sknetwork.admin:
         default: op
         description: Allows use of /sknet.
+    sknetwork.updates.view:
+        default: op
+        description: Told on join when a newer skNetwork is out.

@@ -7,11 +7,6 @@ import java.util.function.Consumer;
 
 import sknetwork.spigot.elements.types.AtomicResult;
 
-/**
- * Atomic changes whose trigger is parked waiting for the proxy.
- * Every callback runs on the main thread, because each one restarts a Skript
- * trigger where it stopped.
- */
 final class AtomicRequests {
 
 	private record Pending(long deadline, Consumer<AtomicResult> resume) {

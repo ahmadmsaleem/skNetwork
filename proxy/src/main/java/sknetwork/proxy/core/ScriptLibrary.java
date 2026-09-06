@@ -17,10 +17,6 @@ import sknetwork.common.Manifest;
 import sknetwork.common.ScriptEntry;
 import sknetwork.common.ScriptPath;
 
-/**
- * The scripts on the proxy's disk. Scans the folder, hashes what it finds, and
- * builds one manifest per server from that server's group membership.
- */
 public final class ScriptLibrary {
 
 

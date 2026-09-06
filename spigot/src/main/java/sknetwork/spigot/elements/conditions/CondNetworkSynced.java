@@ -20,6 +20,7 @@ import sknetwork.spigot.SkNetworkSpigot;
 		Checks whether this server has finished its first sync with the proxy.
 		Until it has, the local copy of the network variables is empty. Every `is not set` check says yes, even for values that other servers can see, and writes are refused.
 		Guard anything that reads or writes a network variable on join with this.
+		
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
 		""")
 @Example("""

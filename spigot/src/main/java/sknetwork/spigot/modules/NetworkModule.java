@@ -108,9 +108,10 @@ public final class NetworkModule implements AddonModule {
 						""")
 				.examples("""
 						on network variable change of "inbox::*":
-							set {_uuid} to the second element of the changed variable split at "::"
-							if player with uuid {_uuid} is online:
-								send the new value to player with uuid {_uuid}
+							set {_who} to the last element of (the changed variable split at "::")
+							set {_player} to {_who} parsed as offline player
+							if {_player} is online:
+								send the new value to {_player}
 						""")
 				.since("0.2.0");
 	}

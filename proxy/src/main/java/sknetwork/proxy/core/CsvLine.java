@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  * 1043, gone, , ,
  *
  * The second line is a delete tombstone: empty type, empty value.
- * The fifth field is how the writing backend rendered the value, so /sknet dump
+ * The fifth field is how the writing backend rendered the value, so /sknetproxy dump
  * has something to print. A v1 line has four fields and no display, which reads
  * back as null.
  */
