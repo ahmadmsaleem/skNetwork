@@ -17,14 +17,13 @@ import sknetwork.spigot.elements.types.AtomicResult;
 import sknetwork.spigot.elements.types.LastAtomic;
 
 @Name("Atomic Result")
-@Description({
-		"The value the proxy holds after it took the last `atomically ... and wait`. For an add, "
-				+ "that is the new total.",
-		"The proxy worked this number out itself, so it is right even when the change has not "
-				+ "reached this server's own copy yet.",
-		"Empty when the proxy refused the change, and empty when no reply came back.",
-		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes"
-})
+@Description("""
+		The value the proxy holds after it took the last `atomically ... and wait`. For an add, that is the new total.
+		The proxy worked this number out itself, so it is right even when the change has not reached this server's own copy yet.
+		Empty when the proxy refused the change, and empty when no reply came back.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes
+		""")
 @Example("""
 		atomically add 50 to {?coins::%player%} and wait
 		if the atomic change succeeded:

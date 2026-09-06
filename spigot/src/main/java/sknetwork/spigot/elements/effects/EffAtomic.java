@@ -27,21 +27,15 @@ import sknetwork.spigot.elements.types.AtomicChange;
 import sknetwork.spigot.elements.types.LastAtomic;
 
 @Name("Atomically Change A Network Variable")
-@Description({
-		"Changes a network variable on the proxy instead of on this server.",
-		"Two servers running a plain `add` at the same moment both read the same number, so one of "
-				+ "the two adds is lost. The proxy does the sum on the one thread that owns the data, "
-				+ "so that cannot happen.",
-		"A plain `remove` is only subtraction and will go past zero without complaining. Use "
-				+ "`without going below` whenever you are spending money.",
-		"`set ... if it is not set` is how you hand out a starting balance once for the whole "
-				+ "network, no matter which server sees the player first.",
-		"Add `and wait` to hold the trigger until the proxy replies, then read the outcome with "
-				+ "`the atomic change succeeded` and `the atomic result`. Everything after it runs on "
-				+ "a later tick, so the usual Skript delay rules apply: you cannot cancel the event "
-				+ "past that point, and it does not belong in a function.",
-		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes"
-})
+@Description("""
+		Changes a network variable on the proxy instead of on this server.
+		Two servers running a plain `add` at the same moment both read the same number, so one of the two adds is lost. The proxy does the sum on the one thread that owns the data, so that cannot happen.
+		A plain `remove` is only subtraction and will go past zero without complaining. Use `without going below` whenever you are spending money.
+		`set ... if it is not set` is how you hand out a starting balance once for the whole network, no matter which server sees the player first.
+		Add `and wait` to hold the trigger until the proxy replies, then read the outcome with `the atomic change succeeded` and `the atomic result`. Everything after it runs on a later tick, so the usual Skript delay rules apply: you cannot cancel the event past that point, and it does not belong in a function.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Atomic-Changes
+		""")
 @Example("""
 		atomically add 50 to {?coins::%player%}
 		atomically remove 50 from {?coins::%player%}

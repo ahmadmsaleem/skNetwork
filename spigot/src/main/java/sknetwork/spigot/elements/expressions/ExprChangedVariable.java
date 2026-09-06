@@ -16,13 +16,12 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.elements.events.NetworkVariableChangeEvent;
 
 @Name("Changed Network Variable")
-@Description({
-		"Inside `on network variable change`, the name that changed and the values either side of "
-				+ "the change.",
-		"The name carries no prefix, because that is how it travels between servers. A delete "
-				+ "leaves the new value unset.",
-		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events"
-})
+@Description("""
+		Inside `on network variable change`, the name that changed and the values either side of the change.
+		The name carries no prefix, because that is how it travels between servers. A delete leaves the new value unset.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
+		""")
 @Example("""
 		on network variable change of "coins::*":
 			broadcast "%the changed variable% went from %the old value% to %the new value%"

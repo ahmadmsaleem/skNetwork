@@ -16,14 +16,13 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.SkNetworkSpigot;
 
 @Name("Network Server Name")
-@Description({
-		"The name this server goes by on the network.",
-		"It is the `server-name` value from this server's skNetwork config, or `server-<port>` when "
-				+ "that is left blank.",
-		"One script can be pushed to every server at once, so this is how a single file can behave "
-				+ "differently depending on where it landed.",
-		"Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events"
-})
+@Description("""
+		The name this server goes by on the network.
+		It is the `server-name` value from this server's skNetwork config, or `server-<port>` when that is left blank.
+		One script can be pushed to every server at once, so this is how a single file can behave differently depending on where it landed.
+		
+		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
+		""")
 @Example("""
 		on join:
 			add player's name to {?online::%network server name%::*}
