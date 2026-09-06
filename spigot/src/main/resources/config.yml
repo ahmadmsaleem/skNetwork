@@ -35,7 +35,7 @@ force-skript-config: true
 # does, the change is reported as refused after this long and the script carries on.
 atomic-timeout: 5s
 
-# Send a readable copy of each value alongside the bytes, so /sknet dump on the
+# Send a readable copy of each value alongside the bytes, so /sknetproxy dump on the
 # proxy can print it. The proxy holds serialised bytes and has no Skript, so
 # without this it can only show how many bytes a variable is.
 #

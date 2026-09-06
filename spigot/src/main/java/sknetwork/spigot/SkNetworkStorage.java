@@ -103,7 +103,7 @@ public final class SkNetworkStorage extends VariablesStorage {
 
 		MutationMode mode = value == null ? MutationMode.DELETE : MutationMode.SET;
 		// the proxy never deserialises, so the one chance to render this value for
-		// /sknet dump is here, on the server that owns the write
+		// /sknetproxy dump is here, on the server that owns the write
 		// Skript has already written this to its own map, so a refusal leaves this
 		// server holding a value the network never took
 		if (!plugin.sendMutation(mode, wireName, type, value, plugin.describe(type, value)))
