@@ -271,7 +271,7 @@ final class ScriptSync {
 					Managed by skNetwork. Everything here is overwritten on the next push.
 
 					Edit the originals on the proxy, in plugins/skNetwork/scripts/, then run
-					/sknet push on the proxy console.
+					/sknetproxy push on the proxy console.
 					""", StandardCharsets.UTF_8);
 		} catch (IOException ignored) {
 		}
