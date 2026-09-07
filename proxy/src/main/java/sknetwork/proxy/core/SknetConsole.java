@@ -1,6 +1,7 @@
 package sknetwork.proxy.core;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
@@ -10,6 +11,8 @@ import sknetwork.common.Style;
 public final class SknetConsole {
 
 	private static final int DUMP_LIMIT = 40;
+
+	private static final String INDENT = Style.MUTED + "│   ";
 
 	public static final String COMMAND = "/sknetproxy";
 
@@ -56,16 +59,67 @@ public final class SknetConsole {
 		reply.accept(Style.header(version, Protocol.VERSION));
 		reply.accept(Style.gap());
 
-		int backends = server.connectionCount();
-		reply.accept(Style.rowRaw("Backends", (backends == 0 ? Style.WARN : Style.GOOD)
-				+ backends + Style.LABEL + (backends == 1 ? " server" : " servers")));
 		reply.accept(Style.row("Variables", Style.number(server.variableCount())
 				+ Style.dim("  seq " + Style.number(server.sequence()))));
+		reply.accept(Style.row("Log", server.logSummary()));
 		reply.accept(Style.row("Scripts", server.scriptSummary()));
+
+		reply.accept(Style.gap());
+		backends(server, reply);
 
 		reply.accept(Style.gap());
 		usage(reply);
 		reply.accept(Style.gap());
+	}
+
+	private static void backends(NetworkServer server, Consumer<String> reply) {
+		List<NetworkServer.Backend> backends = server.backends();
+		if (backends.isEmpty()) {
+			reply.accept(Style.rowRaw("Backends", Style.WARN + "none connected"));
+			reply.accept(Style.note("check 'proxy.host' and 'proxy.token' on each backend"));
+			return;
+		}
+
+		reply.accept(Style.rowRaw("Backends", Style.GOOD + backends.size()
+				+ Style.LABEL + (backends.size() == 1 ? " server" : " servers")));
+
+		int width = 0;
+		for (NetworkServer.Backend backend : backends)
+			width = Math.max(width, backend.name().length());
+
+		for (NetworkServer.Backend backend : backends) {
+			reply.accept(INDENT + Style.BRAND + pad(backend.name(), width)
+					+ Style.LABEL + "  " + backend.address()
+					+ Style.dim("  Skript " + backend.skriptVersion())
+					+ Style.dim("  seq " + Style.number(backend.lastSeq()))
+					+ "  " + progress(backend));
+
+			if (backend.usePlayerUuids() != server.usePlayerUuids())
+				reply.accept(INDENT + " ".repeat(width) + "  " + Style.BAD + "player UUIDs "
+						+ spelling(backend.usePlayerUuids()) + " here, proxy expects "
+						+ spelling(server.usePlayerUuids())
+						+ Style.LABEL + " - two keys for the same player");
+		}
+	}
+
+	private static String progress(NetworkServer.Backend backend) {
+		if (!backend.ready())
+			return Style.WARN + "syncing";
+
+		String state = backend.behind() == 0
+				? Style.GOOD + "ok"
+				: Style.WARN + Style.number(backend.behind()) + " behind";
+		return backend.queuedBytes() == 0
+				? state
+				: state + Style.dim("  " + Style.bytes(backend.queuedBytes()) + " queued");
+	}
+
+	private static String spelling(boolean usePlayerUuids) {
+		return usePlayerUuids ? "on" : "off";
+	}
+
+	private static String pad(String value, int width) {
+		return value.length() >= width ? value : value + " ".repeat(width - value.length());
 	}
 
 	private static void usage(Consumer<String> reply) {
@@ -100,7 +154,7 @@ public final class SknetConsole {
 				+ Style.LABEL + " for " + Style.VALUE + glob));
 		reply.accept(Style.gap());
 		for (NetworkServer.DumpLine line : dump.lines())
-			reply.accept(Style.MUTED + "│   " + Style.BRAND + line.name()
+			reply.accept(INDENT + Style.BRAND + line.name()
 					+ Style.MUTED + " = " + Style.VALUE + line.value()
 					+ Style.dim("  " + line.type() + ", seq " + Style.number(line.seq())));
 

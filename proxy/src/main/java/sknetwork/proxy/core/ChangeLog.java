@@ -16,5 +16,9 @@ interface ChangeLog {
 
 	void maybeCompact(VariableStore store, long seq);
 
+	long bytes();
+
+	long dataLines();
+
 	void close();
 }

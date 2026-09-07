@@ -461,6 +461,81 @@ class NetworkServerTest {
 	}
 
 	@Test
+	void listsEveryConnectedBackendByName() throws IOException {
+		synced("survival");
+		synced("lobby");
+
+		assertEquals(List.of("lobby", "survival"),
+				server.backends().stream().map(NetworkServer.Backend::name).toList());
+	}
+
+	@Test
+	void carriesTheSkriptVersionFromTheHandshake() throws IOException {
+		synced("lobby");
+
+		assertEquals("2.16.2", only().skriptVersion());
+	}
+
+	@Test
+	void carriesTheAddressItConnectedFrom() throws IOException {
+		synced("lobby");
+
+		assertTrue(only().address().contains("127.0.0.1"));
+	}
+
+	@Test
+	void keepsFlaggingABackendKeyingPlayersTheOtherWay() throws IOException {
+		server.usePlayerUuids(true);
+
+		connectWithPlayerUuids("survival", false).sync();
+
+		await(() -> server.backends().size() == 1, "survival never registered");
+		assertFalse(only().usePlayerUuids());
+	}
+
+	@Test
+	void leavesABackendThatAgreesUnflagged() throws IOException {
+		server.usePlayerUuids(true);
+
+		connectWithPlayerUuids("lobby", true).sync();
+
+		await(() -> server.backends().size() == 1, "lobby never registered");
+		assertTrue(only().usePlayerUuids());
+	}
+
+	@Test
+	void keepsABackendThatIsReadingLevelWithTheProxy() throws IOException {
+		FakeBackend lobby = synced("lobby");
+
+		lobby.set("coins", "long", Numbers.writeLong(10));
+		lobby.set("gems", "long", Numbers.writeLong(20));
+
+		await(() -> only().behind() == 0, "lobby never caught up");
+		assertEquals(server.sequence(), only().lastSeq());
+		assertEquals(0, only().queuedBytes());
+	}
+
+	@Test
+	void countsABackendAsBehindByWhatHasNotReachedItsSocket() throws IOException {
+		FakeBackend lobby = synced("lobby");
+		FakeBackend frozen = synced("frozen");
+
+		byte[] blob = new byte[256 * 1024];
+		for (int i = 0; i < 60; i++)
+			lobby.set("blob" + i, "string", blob);
+
+		await(() -> backend("frozen") != null && backend("frozen").behind() > 0,
+				"the frozen backend never fell behind");
+		assertTrue(backend("frozen").queuedBytes() > 0);
+		frozen.close();
+	}
+
+	@Test
+	void reportsNoBackendsBeforeAnyConnect() {
+		assertTrue(server.backends().isEmpty());
+	}
+
+	@Test
 	void replaysWhatABackendMissedRatherThanResending() throws IOException {
 		FakeBackend lobby = synced("lobby");
 		lobby.set("a", "long", Numbers.writeLong(1));
@@ -775,6 +850,19 @@ class NetworkServerTest {
 		ScriptLibrary library = new ScriptLibrary(dataFolder, log, 512 * 1024L, 16 * 1024 * 1024L);
 		library.rescan();
 		return library;
+	}
+
+	private NetworkServer.Backend only() {
+		List<NetworkServer.Backend> backends = server.backends();
+		assertEquals(1, backends.size(), "expected exactly one backend");
+		return backends.get(0);
+	}
+
+	private NetworkServer.Backend backend(String name) {
+		return server.backends().stream()
+				.filter(backend -> backend.name().equals(name))
+				.findFirst()
+				.orElse(null);
 	}
 
 	private void awaitLog(String fragment) {

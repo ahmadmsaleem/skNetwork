@@ -21,6 +21,16 @@ final class NoopChangeLog implements ChangeLog {
 	}
 
 	@Override
+	public long bytes() {
+		return 0;
+	}
+
+	@Override
+	public long dataLines() {
+		return 0;
+	}
+
+	@Override
 	public void close() {
 	}
 }

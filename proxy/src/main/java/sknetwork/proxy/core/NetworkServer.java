@@ -8,7 +8,9 @@ import java.net.Socket;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -27,6 +29,7 @@ import sknetwork.common.Protocol;
 import sknetwork.common.Manifest;
 import sknetwork.common.PlayerAction;
 import sknetwork.common.RemoteServer;
+import sknetwork.common.Style;
 import sknetwork.common.VariableEntry;
 import sknetwork.common.VariableName;
 
@@ -50,6 +53,7 @@ public final class NetworkServer {
 	private final Log log;
 	private final VariableStore store = new VariableStore();
 	private final ChangeLog changeLog;
+	private final boolean persists;
 	private final long flushIntervalMs;
 
 	/**
@@ -104,6 +108,7 @@ public final class NetworkServer {
 		this.log = log;
 		this.flushIntervalMs = flushIntervalMs;
 		this.replayCapacity = Math.max(replayCapacity, 0);
+		this.persists = logFile != null;
 		this.changeLog = logFile == null
 				? new NoopChangeLog()
 				: new CsvChangeLog(logFile, compactRatio, noPersist, log);
@@ -450,7 +455,7 @@ public final class NetworkServer {
 		// key agree instead of each keeping its own. the backend drops the echo.
 		for (BackendConnection connection : connections) {
 			if (connection.isReady())
-				connection.send(delta);
+				connection.send(seq, delta);
 		}
 
 		origin.reply(mutation, outcome, seq);
@@ -619,6 +624,33 @@ public final class NetworkServer {
 		return library.fileCount() + " file(s) at manifest " + library.version();
 	}
 
+	public String logSummary() {
+		if (!persists)
+			return "off";
+
+		long lines = changeLog.dataLines();
+		long keys = store.size();
+		return Style.bytes(changeLog.bytes()) + "  " + Style.number(lines) + " line(s) for "
+				+ Style.number(keys) + " key(s), "
+				+ String.format(Locale.ROOT, "%.1fx", lines / (double) Math.max(keys, 1));
+	}
+
+	public record Backend(String name, String address, String skriptVersion, long lastSeq,
+			long behind, long queuedBytes, boolean usePlayerUuids, boolean ready) {
+	}
+
+	public List<Backend> backends() {
+		long current = sequence.get();
+		List<Backend> all = new ArrayList<>(connections.size());
+
+		for (BackendConnection connection : connections)
+			all.add(new Backend(connection.name(), connection.address(), connection.skriptVersion(),
+					connection.lastSeq(), Math.max(current - connection.lastSeq(), 0),
+					connection.queuedBytes(), connection.usePlayerUuids(), connection.isReady()));
+
+		all.sort(Comparator.comparing(Backend::name, String::compareToIgnoreCase));
+		return all;
+	}
 
 	void reportLoad(String serverName, long version, int loaded, List<String> errors,
 			List<String> warnings) {
@@ -695,7 +727,7 @@ public final class NetworkServer {
 					replayed++;
 				}
 			}
-			target.send(new PacketOut(Protocol.SYNCED).int64(current).bool(false).frame());
+			target.send(current, new PacketOut(Protocol.SYNCED).int64(current).bool(false).frame());
 			target.markReady();
 			sendStateTo(target);
 			pushTo(target);
@@ -724,7 +756,7 @@ public final class NetworkServer {
 			start = end;
 		}
 
-		target.send(new PacketOut(Protocol.SYNCED).int64(current).bool(true).frame());
+		target.send(current, new PacketOut(Protocol.SYNCED).int64(current).bool(true).frame());
 
 		// only now does it start receiving deltas, so none can overtake the snapshot
 		target.markReady();

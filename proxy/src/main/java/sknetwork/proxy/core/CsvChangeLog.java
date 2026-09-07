@@ -233,6 +233,16 @@ final class CsvChangeLog implements ChangeLog {
 	}
 
 	@Override
+	public synchronized long bytes() {
+		return file.length();
+	}
+
+	@Override
+	public synchronized long dataLines() {
+		return dataLines;
+	}
+
+	@Override
 	public synchronized void maybeCompact(VariableStore store, long seq) {
 		if (dataLines > MIN_LINES_BEFORE_COMPACT
 				&& dataLines > compactRatio * Math.max(store.size(), 1))
