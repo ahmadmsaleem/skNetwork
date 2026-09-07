@@ -87,6 +87,20 @@ public final class Style {
 		return String.format(Locale.ROOT, "%,d", value);
 	}
 
+	public static String bytes(long value) {
+		if (value < 1024)
+			return value + " B";
+
+		String[] units = { "KB", "MB", "GB", "TB" };
+		double scaled = value / 1024.0;
+		int unit = 0;
+		while (scaled >= 1024 && unit < units.length - 1) {
+			scaled /= 1024;
+			unit++;
+		}
+		return String.format(Locale.ROOT, "%.1f %s", scaled, units[unit]);
+	}
+
 	private static String pad(String label) {
 		if (label.length() >= LABEL_WIDTH)
 			return label + " ";

@@ -53,6 +53,20 @@ class StyleTest {
 	}
 
 	@Test
+	void keepsSmallSizesInBytes() {
+		assertEquals("0 B", Style.bytes(0));
+		assertEquals("1023 B", Style.bytes(1023));
+	}
+
+	@Test
+	void stepsUpAUnitAtATime() {
+		assertEquals("1.0 KB", Style.bytes(1024));
+		assertEquals("1.5 KB", Style.bytes(1536));
+		assertEquals("1.0 MB", Style.bytes(1024 * 1024));
+		assertEquals("2.0 GB", Style.bytes(2L * 1024 * 1024 * 1024));
+	}
+
+	@Test
 	void separatesThousands() {
 		assertEquals("1,234,567", Style.number(1_234_567));
 		assertEquals("0", Style.number(0));
