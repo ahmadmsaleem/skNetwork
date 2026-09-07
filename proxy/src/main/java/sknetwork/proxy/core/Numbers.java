@@ -24,14 +24,12 @@ final class Numbers {
 		return bits;
 	}
 
-	/** @throws IllegalArgumentException if the type is not a whole number we know */
 	static long readLong(String type, byte[] value) {
 		if (!isIntegral(type))
 			throw new IllegalArgumentException("'" + type + "' is not a whole number");
 		return signed(bits(value), value.length);
 	}
 
-	/** @throws IllegalArgumentException if the type is not a number we know */
 	static double readDouble(String type, byte[] value) {
 		long bits = bits(value);
 		return switch (type) {
@@ -47,10 +45,6 @@ final class Numbers {
 		return unused <= 0 ? bits : (bits << unused) >> unused;
 	}
 
-	/**
-	 * How the proxy prints a number it worked out itself. Skript trims a whole
-	 * double to "2" rather than "2.0", so this does too.
-	 */
 	static String display(double value) {
 		if (value == Math.rint(value) && Math.abs(value) < 1e15)
 			return Long.toString((long) value);

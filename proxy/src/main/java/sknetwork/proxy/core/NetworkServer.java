@@ -37,12 +37,6 @@ public final class NetworkServer {
 
 	private static final int SNAPSHOT_CHUNK = 500;
 
-	/**
-	 * A chunk closes once it holds this much, whatever its count. Each value fitted
-	 * in a frame on its way in, but five hundred of them together need not, and a
-	 * backend that reads a frame past the cap drops the connection, reconnects,
-	 * and is sent the same snapshot again for as long as it lives.
-	 */
 	private static final int SNAPSHOT_CHUNK_BYTES = Frame.MAX_LENGTH / 2;
 
 	private static final long DEFAULT_BACKLOG_BYTES = 64L * 1024 * 1024;
@@ -54,12 +48,9 @@ public final class NetworkServer {
 	private final VariableStore store = new VariableStore();
 	private final ChangeLog changeLog;
 	private final boolean persists;
+	private final String logName;
 	private final long flushIntervalMs;
 
-	/**
-	 * Mutations, snapshots and replays all queue here, so a backend joining
-	 * mid-write cannot get a snapshot that disagrees with the deltas after it.
-	 */
 	private final BlockingQueue<Runnable> writeQueue = new LinkedBlockingQueue<>();
 
 	private final ArrayDeque<Replayable> replay = new ArrayDeque<>();
@@ -72,17 +63,10 @@ public final class NetworkServer {
 	private volatile ServerSocket serverSocket;
 	private ScheduledExecutorService flusher;
 
-	/** Null unless script distribution is turned on. */
 	private volatile ScriptLibrary scripts;
 
 	private final NetworkState state = new NetworkState();
 
-	/**
-	 * Every change to the state and the broadcast that follows it happen under this
-	 * lock. Two backends report at the same instant whenever a player hops between
-	 * them, and without it one backend can be handed the two frames in the other
-	 * order and be left holding the older picture.
-	 */
 	private final Object stateLock = new Object();
 	private volatile ProxyActions actions;
 	private volatile long backlogLimit = DEFAULT_BACKLOG_BYTES;
@@ -109,6 +93,7 @@ public final class NetworkServer {
 		this.flushIntervalMs = flushIntervalMs;
 		this.replayCapacity = Math.max(replayCapacity, 0);
 		this.persists = logFile != null;
+		this.logName = logFile == null ? "none" : logFile.getName();
 		this.changeLog = logFile == null
 				? new NoopChangeLog()
 				: new CsvChangeLog(logFile, compactRatio, noPersist, log);
@@ -122,7 +107,6 @@ public final class NetworkServer {
 		this.scripts = library;
 	}
 
-	/** Only {@code connect} needs the platform; everything else is routed to a backend. */
 	public void actions(ProxyActions actions) {
 		this.actions = actions;
 	}
@@ -144,7 +128,6 @@ public final class NetworkServer {
 		backlogLimit = bytes;
 	}
 
-	/** What Skript's 'use player UUIDs in variable names' should be on every backend. */
 	public void usePlayerUuids(boolean usePlayerUuids) {
 		this.usePlayerUuids = usePlayerUuids;
 	}
@@ -194,7 +177,6 @@ public final class NetworkServer {
 		accept.setDaemon(true);
 		accept.start();
 
-		// a crash loses at most one of these windows
 		flusher = Executors.newSingleThreadScheduledExecutor(task -> {
 			Thread thread = new Thread(task, "skNetwork-flush");
 			thread.setDaemon(true);
@@ -245,7 +227,6 @@ public final class NetworkServer {
 				Thread.currentThread().interrupt();
 				return;
 			} catch (RuntimeException e) {
-				// a bad mutation must not kill the only writer thread
 				log.error("write failed", e);
 			}
 		}
@@ -257,11 +238,6 @@ public final class NetworkServer {
 		connections.add(connection);
 	}
 
-	/**
-	 * Two backends under one name is a config typo, not a setup. Both get the same
-	 * scripts, both write to the same per-server keys, and the console shows the
-	 * name twice with no way to tell them apart.
-	 */
 	private void warnIfNameTaken(BackendConnection joining) {
 		for (BackendConnection existing : connections) {
 			if (!existing.name().equals(joining.name()))
@@ -278,12 +254,6 @@ public final class NetworkServer {
 		}
 	}
 
-	/**
-	 * Skript keys {@code {?coins::%player%}} by UUID or by name depending on its own
-	 * config, and the name it hands us is already flattened to text, so the two cannot
-	 * be told apart afterwards. Backends that disagree write one player to two keys and
-	 * quietly stop seeing each other. Say so while it is still a line in a log.
-	 */
 	private void warnIfPlayerKeysDiffer(BackendConnection joining) {
 		if (joining.usePlayerUuids() == usePlayerUuids)
 			return;
@@ -300,14 +270,11 @@ public final class NetworkServer {
 	void unregister(BackendConnection connection) {
 		connections.remove(connection);
 		synchronized (stateLock) {
-			// only what this connection reported. a rejected handshake or a socket that
-			// died long ago must not remove the entry of the backend now using the name
 			if (state.remove(connection, connection.name()))
 				broadcastState();
 		}
 	}
 
-	/** A backend told us about itself, so everyone else gets the new picture. */
 	void serverInfo(BackendConnection origin, RemoteServer info) {
 		synchronized (stateLock) {
 			state.put(origin, info);
@@ -315,7 +282,6 @@ public final class NetworkServer {
 		}
 	}
 
-	/** Call with {@link #stateLock} held. */
 	private void broadcastState() {
 		if (!players)
 			return;
@@ -334,10 +300,6 @@ public final class NetworkServer {
 		}
 	}
 
-	/**
-	 * Sends one action on to whoever can carry it out. A player nobody is holding is
-	 * dropped, the same way a delete of a key nobody has costs nothing.
-	 */
 	void playerAction(BackendConnection origin, PlayerAction action, List<String> targets,
 			String payload) {
 		if (!players) {
@@ -377,7 +339,6 @@ public final class NetworkServer {
 		return out.string(payload).frame();
 	}
 
-	/** @param servers empty means every backend */
 	void consoleCommand(BackendConnection origin, List<String> servers, String command) {
 		if (!remoteCommands) {
 			log.warn(origin.name() + " tried to run '" + command + "' on another server, but "
@@ -397,7 +358,6 @@ public final class NetworkServer {
 				+ (servers.isEmpty() ? "every server" : String.join(", ", servers)));
 	}
 
-	/** Returns at once; the writer thread does the work. */
 	void submitMutation(BackendConnection origin, Mutation mutation) {
 		writeQueue.add(() -> applyAndBroadcast(origin, mutation));
 	}
@@ -437,8 +397,6 @@ public final class NetworkServer {
 				outcome.delete() ? null : outcome.value(),
 				outcome.delete() ? null : outcome.display());
 
-		// the previous value rides along because the server that wrote it has already
-		// overwritten its own copy by the time this gets back, so only we still know
 		Frame delta = new PacketOut(Protocol.DELTA)
 				.int64(seq)
 				.varInt(outcome.delete() ? MutationMode.DELETE.id() : MutationMode.SET.id())
@@ -451,8 +409,6 @@ public final class NetworkServer {
 
 		remember(seq, delta);
 
-		// the origin gets it back too. that is what makes two backends writing the same
-		// key agree instead of each keeping its own. the backend drops the echo.
 		for (BackendConnection connection : connections) {
 			if (connection.isReady())
 				connection.send(seq, delta);
@@ -465,10 +421,7 @@ public final class NetworkServer {
 	}
 
 
-	/** Runs on the writer thread, so read-compute-write here cannot interleave. */
 	private Outcome resolve(Mutation mutation, VariableEntry current) {
-		// a name ending in ::* is a whole branch. only a delete means anything there;
-		// anything else stores a key literally called "x::*", which no backend can read back.
 		if (VariableName.isTree(mutation.name()) && mutation.mode() != MutationMode.DELETE)
 			return Outcome.refused("{" + mutation.name() + "} is a list, so it can only be deleted");
 
@@ -517,7 +470,6 @@ public final class NetworkServer {
 		if (!after.applied())
 			return after;
 
-		// compare as whole numbers when both are, so a balance past 2^53 is still exact
 		boolean whole = Numbers.isIntegral(after.type()) && Numbers.isIntegral(mutation.expectedType());
 		boolean below = whole
 				? Numbers.readLong(after.type(), after.value())
@@ -579,9 +531,6 @@ public final class NetworkServer {
 
 	private void pushTo(BackendConnection target) {
 		ScriptLibrary library = scripts;
-		// no library means distribution is off. A backend still holding what it was
-		// pushed while it was on has to be told to drop it, or it runs those scripts
-		// for as long as nobody notices the folder.
 		Manifest manifest = library == null
 				? new Manifest(Manifest.NO_VERSION, List.of())
 				: library.manifestFor(target.name());
@@ -590,10 +539,6 @@ public final class NetworkServer {
 		target.sendManifest(manifest);
 	}
 
-	/**
-	 * @param force send even when nothing on disk changed
-	 * @return how many servers were pushed to
-	 */
 	public int push(boolean force) {
 		ScriptLibrary library = scripts;
 		if (library == null)
@@ -635,6 +580,33 @@ public final class NetworkServer {
 				+ String.format(Locale.ROOT, "%.1fx", lines / (double) Math.max(keys, 1));
 	}
 
+	public record LogStats(boolean persists, String name, long bytes, long dataLines,
+			long liveKeys, long compactThreshold, long lastCompaction, long lastFlush) {
+	}
+
+	public LogStats logStats() {
+		long keys = store.size();
+		return new LogStats(persists, logName, changeLog.bytes(), changeLog.dataLines(), keys,
+				changeLog.compactThreshold(keys), changeLog.lastCompaction(), changeLog.lastFlush());
+	}
+
+	public record Compaction(long linesBefore, long bytesBefore, long linesAfter, long bytesAfter) {
+	}
+
+	public Compaction compactNow() {
+		if (!persists)
+			return null;
+
+		long linesBefore = changeLog.dataLines();
+		long bytesBefore = changeLog.bytes();
+		changeLog.compact(store, sequence.get());
+		return new Compaction(linesBefore, bytesBefore, changeLog.dataLines(), changeLog.bytes());
+	}
+
+	public File backupNow() throws IOException {
+		return persists ? changeLog.backup() : null;
+	}
+
 	public record Backend(String name, String address, String skriptVersion, long lastSeq,
 			long behind, long queuedBytes, boolean usePlayerUuids, boolean ready) {
 	}
@@ -671,16 +643,9 @@ public final class NetworkServer {
 	public record DumpLine(String name, String type, String value, long seq) {
 	}
 
-	/** @param total how many matched, which may be more than {@code lines} holds */
 	public record Dump(int total, List<DumpLine> lines) {
 	}
 
-	/**
-	 * Read straight off the concurrent map, not queued on the writer, so an admin
-	 * command never waits behind whatever is being written.
-	 *
-	 * @param glob {@code *} is a wildcard, so {@code coins::*} is a whole tree
-	 */
 	public Dump dump(String glob, int limit) {
 		List<Map.Entry<String, VariableEntry>> matched = store.matching(glob);
 		List<DumpLine> lines = new ArrayList<>(Math.min(matched.size(), Math.max(limit, 0)));
@@ -689,7 +654,6 @@ public final class NetworkServer {
 			if (lines.size() >= limit)
 				break;
 			VariableEntry variable = entry.getValue();
-			// no display means an older backend wrote it, or it was too big to render
 			String shown = variable.display != null
 					? variable.display
 					: "<" + (variable.value == null ? 0 : variable.value.length) + " bytes, no display>";
@@ -706,12 +670,9 @@ public final class NetworkServer {
 			replay.removeFirst();
 	}
 
-	/** Replays what a backend missed, or sends everything if it was away too long. */
 	private void sync(BackendConnection target, long lastSeq) {
 		long current = sequence.get();
 
-		// a lastSeq past ours means the proxy was restored from behind this backend, so
-		// its copy holds writes we have no record of and must be rebuilt
 		boolean plausible = lastSeq > 0 && lastSeq <= current;
 		boolean covered = lastSeq == current
 				|| (!replay.isEmpty() && lastSeq + 1 >= replay.peekFirst().seq());
@@ -738,7 +699,6 @@ public final class NetworkServer {
 		List<Map.Entry<String, VariableEntry>> pending = store.entries();
 		int start = 0;
 		while (start < pending.size()) {
-			// the count goes first, so the entries are staged and the header written last
 			PacketOut entries = new PacketOut(Protocol.SNAPSHOT);
 			int end = start;
 			while (end < pending.size() && end - start < SNAPSHOT_CHUNK
@@ -758,7 +718,6 @@ public final class NetworkServer {
 
 		target.send(current, new PacketOut(Protocol.SYNCED).int64(current).bool(true).frame());
 
-		// only now does it start receiving deltas, so none can overtake the snapshot
 		target.markReady();
 		sendStateTo(target);
 		pushTo(target);

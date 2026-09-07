@@ -12,7 +12,6 @@ public interface ConfigSource {
 
 	boolean flag(String path, boolean fallback);
 
-	/** @return the keys directly under this path, in file order, or empty if there are none */
 	List<String> keys(String path);
 
 	List<String> stringList(String path);
