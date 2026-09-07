@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -149,7 +150,7 @@ class CsvChangeLogTest {
 		List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
 
 		assertTrue(lines.get(0).startsWith("#"));
-		assertTrue(comments().stream().anyMatch(line -> line.contains("do not modify this file")));
+		assertTrue(comments().stream().anyMatch(line -> line.contains("Never modify this file")));
 	}
 
 	/** Compaction rewrites the file from nothing, so the notice has to survive it. */
@@ -166,7 +167,7 @@ class CsvChangeLogTest {
 		changeLog.maybeCompact(store, 1500);
 		changeLog.close();
 
-		assertTrue(comments().stream().anyMatch(line -> line.contains("do not modify this file")));
+		assertTrue(comments().stream().anyMatch(line -> line.contains("Never modify this file")));
 	}
 
 	/** The notice is only comments, so replaying a file that carries it must be unchanged. */
@@ -201,6 +202,153 @@ class CsvChangeLogTest {
 		assertTrue(comments().contains("# skNetwork v2 seq=1500"));
 		assertTrue(log.sawAny("compacted"));
 		assertTrue(new File(folder, "network.csv.bak").isFile());
+	}
+
+	@Test
+	void compactsOnDemandBelowTheThreshold() throws IOException {
+		VariableStore store = new VariableStore();
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(store);
+
+		for (int seq = 1; seq <= 20; seq++) {
+			store.set("coins", "long", Numbers.writeLong(seq), String.valueOf(seq), seq);
+			changeLog.append(seq, "coins", "long", Numbers.writeLong(seq), String.valueOf(seq));
+		}
+		changeLog.maybeCompact(store, 20);
+		assertEquals(20, changeLog.dataLines());
+
+		changeLog.compact(store, 20);
+		changeLog.close();
+
+		assertEquals(1, changeLog.dataLines());
+		assertEquals(1, dataLines().size());
+	}
+
+	@Test
+	void holdsTheFloorUntilThereAreEnoughLines() {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+
+		assertEquals(1_000, changeLog.compactThreshold(1));
+		assertEquals(1_000, changeLog.compactThreshold(400));
+	}
+
+	@Test
+	void followsTheRatioOnceItIsPastTheFloor() {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+
+		assertEquals(2_000, changeLog.compactThreshold(1_000));
+		assertEquals(20_000, changeLog.compactThreshold(10_000));
+	}
+
+	@Test
+	void countsAnEmptyStoreAsOneKey() {
+		assertEquals(1_000, new CsvChangeLog(file, 2.0, log).compactThreshold(0));
+	}
+
+	@Test
+	void hasNoTimestampsBeforeAnythingHappens() throws IOException {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(new VariableStore());
+
+		assertEquals(0, changeLog.lastFlush());
+		assertEquals(0, changeLog.lastCompaction());
+	}
+
+	@Test
+	void remembersWhenItLastFlushedAndCompacted() throws IOException {
+		VariableStore store = new VariableStore();
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(store);
+
+		store.set("coins", "long", Numbers.writeLong(1), "1", 1);
+		changeLog.append(1, "coins", "long", Numbers.writeLong(1), "1");
+		changeLog.flush();
+		assertTrue(changeLog.lastFlush() > 0);
+
+		changeLog.compact(store, 1);
+		changeLog.close();
+
+		assertTrue(changeLog.lastCompaction() > 0);
+	}
+
+	@Test
+	void leavesTheFlushTimeAloneWhenThereIsNothingToWrite() throws IOException {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(new VariableStore());
+
+		changeLog.flush();
+
+		assertEquals(0, changeLog.lastFlush());
+	}
+
+	@Test
+	void copiesTheLogIntoTheBackupFolder() throws IOException {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(new VariableStore());
+		changeLog.append(1, "coins", "long", Numbers.writeLong(100), "100");
+
+		File copy = changeLog.backup();
+		changeLog.close();
+
+		assertNotNull(copy);
+		assertEquals("backup", copy.getParentFile().getName());
+		assertEquals(folder, copy.getParentFile().getParentFile());
+		assertTrue(copy.isFile());
+		assertTrue(log.sawAny("backed up"));
+	}
+
+	@Test
+	void backsUpEveryLineThatWasWritten() throws IOException {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(new VariableStore());
+		changeLog.append(1, "coins", "long", Numbers.writeLong(100), "100");
+		changeLog.append(2, "gems", "long", Numbers.writeLong(7), "7");
+
+		File copy = changeLog.backup();
+		changeLog.close();
+
+		List<String> copied = Files.readAllLines(copy.toPath(), StandardCharsets.UTF_8).stream()
+				.filter(line -> !line.isBlank() && !line.startsWith("#"))
+				.toList();
+
+		assertEquals(2, copied.size());
+		assertTrue(copied.get(0).contains("coins"));
+		assertTrue(copied.get(1).contains("gems"));
+	}
+
+	@Test
+	void namesTheBackupAfterTheLogAndTheTime() throws IOException {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(new VariableStore());
+
+		File copy = changeLog.backup();
+		changeLog.close();
+
+		assertTrue(copy.getName().startsWith("network-"), copy.getName());
+		assertTrue(copy.getName().endsWith(".csv"), copy.getName());
+	}
+
+	@Test
+	void leavesTheLogUsableAfterABackup() throws IOException {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+		changeLog.open(new VariableStore());
+		changeLog.append(1, "coins", "long", Numbers.writeLong(100), "100");
+		changeLog.backup();
+		changeLog.append(2, "gems", "long", Numbers.writeLong(7), "7");
+		changeLog.close();
+
+		VariableStore store = new VariableStore();
+		assertEquals(2, open(store));
+		assertEquals(2, store.size());
+	}
+
+	@Test
+	void refusesToBackUpALogThatDoesNotExistYet() {
+		CsvChangeLog changeLog = new CsvChangeLog(file, 2.0, log);
+
+		IOException failure = assertThrows(IOException.class, changeLog::backup);
+
+		assertTrue(failure.getMessage().contains("nothing to copy"));
 	}
 
 	@Test

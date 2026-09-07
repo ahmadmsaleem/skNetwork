@@ -6,11 +6,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-/**
- * A set of variable-name globs, matched as a whole. {@code *} is the only
- * wildcard, so {@code session::*} is a whole tree and a pattern without one has
- * to match the name exactly - the same spelling {@code /sknetproxy dump} takes.
- */
 final class NamePatterns {
 
 	private static final NamePatterns NONE = new NamePatterns(List.of());
@@ -25,7 +20,6 @@ final class NamePatterns {
 		return NONE;
 	}
 
-	/** Blank entries are dropped, so a stray '- ' in the config does not match everything. */
 	static NamePatterns of(Collection<String> globs) {
 		if (globs == null || globs.isEmpty())
 			return NONE;
@@ -56,10 +50,6 @@ final class NamePatterns {
 		return false;
 	}
 
-	/**
-	 * A glob as a whole-string regex. Everything but {@code *} is quoted, so a name
-	 * holding regex punctuation is matched literally.
-	 */
 	static Pattern compile(String glob) {
 		StringBuilder regex = new StringBuilder();
 		int from = 0;
