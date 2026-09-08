@@ -46,6 +46,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	private final NetworkCache network = new NetworkCache();
 
 	private final Throttle dropWarnings = new Throttle(10_000);
+	private final Throttle playerKeyWarnings = new Throttle(60_000);
 	private final AtomicLong droppedWrites = new AtomicLong();
 	private volatile boolean warnedPrefixMismatch;
 
@@ -302,6 +303,16 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	private void fire(org.bukkit.event.Event event) {
 		if (isEnabled())
 			getServer().getScheduler().runTask(this, () -> getServer().getPluginManager().callEvent(event));
+	}
+
+	public void warnUnresolvedPlayerKey(String who) {
+		if (!playerKeyWarnings.allow())
+			return;
+
+		getLogger().warning("Skript keys player variables by UUID on this server, but it has never "
+				+ "seen '" + who + "', so {?...::%network player \"" + who + "\"%} falls back to the "
+				+ "name. That is a different key from the one a server holding them writes. Use the "
+				+ "player themselves, or key the variable on something this server can resolve.");
 	}
 
 	void warnPrefixMismatch(String name) {

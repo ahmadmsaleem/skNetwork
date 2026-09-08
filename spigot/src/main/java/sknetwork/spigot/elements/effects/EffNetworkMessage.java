@@ -1,5 +1,6 @@
 package sknetwork.spigot.elements.effects;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import ch.njol.skript.doc.Description;
@@ -20,6 +21,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.common.PlayerAction;
 import sknetwork.spigot.NetworkText;
 import sknetwork.spigot.SkNetworkSpigot;
+import sknetwork.spigot.elements.types.NetworkPlayer;
 
 @Name("Network Message")
 @Description("""
@@ -42,13 +44,13 @@ public class EffNetworkMessage extends Effect {
 		registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffNetworkMessage.class)
 				.supplier(EffNetworkMessage::new)
 				.addPatterns(
-						"send network message %objects% to network player[s] %strings%",
+						"send network message %objects% to network player[s] %networkplayers%",
 						"broadcast %objects% (across|to) [the] network")
 				.build());
 	}
 
 	private Expression<? extends Component> messages;
-	private Expression<String> targets;
+	private Expression<NetworkPlayer> targets;
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -58,7 +60,7 @@ public class EffNetworkMessage extends Effect {
 		if (messages == null)
 			return false;
 		if (matchedPattern == 0)
-			targets = (Expression<String>) exprs[1];
+			targets = (Expression<NetworkPlayer>) exprs[1];
 		return true;
 	}
 
@@ -68,9 +70,20 @@ public class EffNetworkMessage extends Effect {
 		if (plugin == null)
 			return;
 
-		List<String> to = targets == null ? List.of() : List.of(targets.getArray(event));
+		List<String> to = names(targets, event);
 		for (Component message : messages.getArray(event))
 			plugin.playerAction(PlayerAction.MESSAGE, to, NetworkText.toJson(message));
+	}
+
+	private static List<String> names(Expression<NetworkPlayer> targets, Event event) {
+		if (targets == null)
+			return List.of();
+
+		List<String> names = new ArrayList<>();
+		for (NetworkPlayer player : targets.getArray(event))
+			if (player.name() != null)
+				names.add(player.name());
+		return names;
 	}
 
 	@Override

@@ -8,6 +8,7 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.elements.conditions.CondAtomicChange;
 import sknetwork.spigot.elements.conditions.CondNetworkSynced;
+import sknetwork.spigot.elements.conditions.CondNetworkPlayerOnline;
 import sknetwork.spigot.elements.conditions.CondServerOnline;
 import sknetwork.spigot.elements.effects.EffAtomic;
 import sknetwork.spigot.elements.effects.EffConnectPlayer;
@@ -21,6 +22,8 @@ import sknetwork.spigot.elements.events.NetworkVariableChangeEvent;
 import sknetwork.spigot.elements.expressions.ExprAtomicError;
 import sknetwork.spigot.elements.expressions.ExprAtomicResult;
 import sknetwork.spigot.elements.expressions.ExprChangedVariable;
+import sknetwork.spigot.elements.expressions.ExprNetworkPlayer;
+import sknetwork.spigot.elements.expressions.ExprNetworkPlayerDetail;
 import sknetwork.spigot.elements.expressions.ExprNetworkPlayers;
 import sknetwork.spigot.elements.expressions.ExprNetworkServers;
 import sknetwork.spigot.elements.expressions.ExprPlayerServer;
@@ -28,6 +31,7 @@ import sknetwork.spigot.elements.expressions.ExprServerDetail;
 import sknetwork.spigot.elements.expressions.ExprServerMaxPlayers;
 import sknetwork.spigot.elements.expressions.ExprServerName;
 import sknetwork.spigot.elements.expressions.ExprServerWhitelist;
+import sknetwork.spigot.elements.types.NetworkPlayerType;
 
 /** Everything skNetwork adds to Skript's grammar. */
 public final class NetworkModule implements AddonModule {
@@ -40,6 +44,8 @@ public final class NetworkModule implements AddonModule {
 
 	@Override
 	public void load(@NotNull SkriptAddon addon) {
+		NetworkPlayerType.register();
+
 		SyntaxRegistry registry = addon.syntaxRegistry();
 
 		CondNetworkSynced.register(registry);
@@ -50,12 +56,15 @@ public final class NetworkModule implements AddonModule {
 		ExprAtomicError.register(registry);
 
 		CondServerOnline.register(registry);
+		CondNetworkPlayerOnline.register(registry);
 		EffNetworkMessage.register(registry);
 		EffNetworkActionBar.register(registry);
 		EffConnectPlayer.register(registry);
 		EffServerCommand.register(registry);
 		ExprNetworkServers.register(registry);
+		ExprNetworkPlayer.register(registry);
 		ExprNetworkPlayers.register(registry);
+		ExprNetworkPlayerDetail.register(registry);
 		ExprPlayerServer.register(registry);
 		ExprServerDetail.register(registry);
 		ExprServerMaxPlayers.register(registry);
