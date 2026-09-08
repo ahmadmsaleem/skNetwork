@@ -19,6 +19,7 @@ import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
 import sknetwork.common.PingField;
 import sknetwork.common.PlayerAction;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
 
@@ -214,6 +215,7 @@ final class BackendConnection {
 			case Protocol.SERVER_INFO -> server.serverInfo(this, RemoteServer.read(packet));
 			case Protocol.PLAYER_ACTION -> playerAction(packet);
 			case Protocol.CONSOLE_COMMAND -> consoleCommand(packet);
+			case Protocol.PLAYER_PROPERTIES -> server.playerProperties(this, properties(packet));
 			case Protocol.PING_SET -> server.pingSet(this,
 					PingField.byId((byte) packet.varInt()), packet.nullableString());
 			default -> server.log().warn("ignoring unexpected opcode 0x"
@@ -241,6 +243,17 @@ final class BackendConnection {
 
 	private void consoleCommand(PacketIn packet) throws IOException {
 		server.consoleCommand(this, names(packet), packet.string());
+	}
+
+	private static List<PlayerProperties> properties(PacketIn packet) throws IOException {
+		int count = packet.varInt();
+		if (count < 0 || count > 100_000)
+			throw new IOException("player detail count " + count + " is out of range");
+
+		List<PlayerProperties> rows = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+			rows.add(PlayerProperties.read(packet));
+		return rows;
 	}
 
 	private static List<String> names(PacketIn packet) throws IOException {

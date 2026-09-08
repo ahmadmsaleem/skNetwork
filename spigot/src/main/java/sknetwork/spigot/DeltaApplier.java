@@ -23,6 +23,7 @@ import sknetwork.common.PingSettings;
 import sknetwork.common.Protocol;
 import sknetwork.common.PlayerAction;
 import sknetwork.common.PlayerChange;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.Throttle;
 import sknetwork.common.VariableName;
 import sknetwork.spigot.elements.events.NetworkPlayerJoinEvent;
@@ -205,6 +206,17 @@ final class DeltaApplier extends BukkitRunnable {
 			}
 			case Protocol.PLAYER_DELIVERY -> {
 				deliver(packet);
+				return 1;
+			}
+			case Protocol.PLAYER_PROPERTIES -> {
+				int count = packet.varInt();
+				if (count < 0 || count > 100_000)
+					throw new IOException("player detail count " + count + " is out of range");
+
+				List<PlayerProperties> rows = new ArrayList<>(count);
+				for (int i = 0; i < count; i++)
+					rows.add(PlayerProperties.read(packet));
+				plugin.network().properties(rows);
 				return 1;
 			}
 			case Protocol.PING_STATE -> {

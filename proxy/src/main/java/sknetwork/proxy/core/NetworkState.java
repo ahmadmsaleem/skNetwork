@@ -14,6 +14,7 @@ import java.util.function.LongSupplier;
 import sknetwork.common.Frame;
 import sknetwork.common.PacketOut;
 import sknetwork.common.PlayerChange;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
 
@@ -30,11 +31,15 @@ final class NetworkState {
 	private record Leaving(String name, String from, long since) {
 	}
 
+	private record Tracked(PlayerProperties properties, long receivedAt) {
+	}
+
 	private final Map<String, Held> servers = new ConcurrentHashMap<>();
 	private long reports;
 
 	private volatile Map<String, Placement> holders = Map.of();
 
+	private final Map<String, Tracked> properties = new ConcurrentHashMap<>();
 	private final Map<String, Leaving> leaving = new LinkedHashMap<>();
 	private final List<PlayerChange> pending = new ArrayList<>();
 	private final LongSupplier clock;
@@ -60,6 +65,32 @@ final class NetworkState {
 			return false;
 		reindex();
 		return true;
+	}
+
+	/** @return the rows that actually moved, so nothing unchanged is passed on */
+	List<PlayerProperties> merge(List<PlayerProperties> incoming) {
+		long now = clock.getAsLong();
+		List<PlayerProperties> changed = new ArrayList<>();
+
+		for (PlayerProperties row : incoming) {
+			Tracked held = properties.get(key(row.player()));
+			if (held != null && !row.differsFrom(held.properties())
+					&& row.playtimeTicks() == held.properties().playtimeTicks())
+				continue;
+
+			properties.put(key(row.player()), new Tracked(row, now));
+			changed.add(row);
+		}
+		return changed;
+	}
+
+	/** Everything known, with each playtime brought up to date. */
+	List<PlayerProperties> propertiesNow() {
+		long now = clock.getAsLong();
+		List<PlayerProperties> all = new ArrayList<>(properties.size());
+		for (Tracked held : properties.values())
+			all.add(held.properties().advancedBy(now - held.receivedAt()));
+		return all;
 	}
 
 	List<PlayerChange> drain() {
@@ -124,6 +155,8 @@ final class NetworkState {
 			Placement was = entry.getValue();
 			leaving.putIfAbsent(entry.getKey(), new Leaving(was.name(), was.server(), now));
 		}
+
+		properties.keySet().removeIf(name -> !fresh.containsKey(name) && !leaving.containsKey(name));
 	}
 
 	private static String key(String player) {

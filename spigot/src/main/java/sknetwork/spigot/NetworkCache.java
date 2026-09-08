@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import sknetwork.common.PacketIn;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.RemoteServer;
 import sknetwork.spigot.elements.types.NetworkPlayer;
 
@@ -25,6 +26,11 @@ public final class NetworkCache {
 	private static final Picture EMPTY = new Picture(Map.of(), Map.of(), Map.of(), List.of());
 
 	private volatile Picture picture = EMPTY;
+
+	private record Stamped(PlayerProperties properties, long receivedAt) {
+	}
+
+	private final Map<String, Stamped> properties = new java.util.concurrent.ConcurrentHashMap<>();
 
 	void replace(PacketIn packet) throws IOException {
 		int count = packet.varInt();
@@ -48,10 +54,25 @@ public final class NetworkCache {
 			}
 		}
 		picture = new Picture(servers, holders, byName, all);
+		properties.keySet().retainAll(holders.keySet());
 	}
 
 	void clear() {
 		picture = EMPTY;
+		properties.clear();
+	}
+
+	void properties(List<PlayerProperties> rows) {
+		long now = System.currentTimeMillis();
+		for (PlayerProperties row : rows)
+			properties.put(row.player().toLowerCase(Locale.ROOT), new Stamped(row, now));
+	}
+
+	/** @return that player's details with playtime brought up to now, or null */
+	public PlayerProperties properties(String player) {
+		Stamped held = properties.get(player.toLowerCase(Locale.ROOT));
+		return held == null ? null
+				: held.properties().advancedBy(System.currentTimeMillis() - held.receivedAt());
 	}
 
 	public RemoteServer server(String name) {
