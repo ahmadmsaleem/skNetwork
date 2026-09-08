@@ -2,6 +2,7 @@ package sknetwork.spigot.elements.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -16,64 +17,60 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.registration.DefaultSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxRegistry;
-import sknetwork.spigot.SkNetworkSpigot;
 import sknetwork.spigot.elements.types.NetworkPlayer;
+import sknetwork.spigot.elements.types.NetworkPlayers;
 
-@Name("Network Server Of Player")
+@Name("Network Player Name / UUID")
 @Description("""
-		Which server a player is on, by name, or nothing when nobody on the network is holding them.
-		Use it before moving somebody, so you do not connect them to the server they are already standing on.
+		The name or the UUID of a network player.
+		The proxy sends names, so a UUID is filled in from this server's own knowledge of that player and is not set for somebody it has never seen.
 		
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")
 @Example("""
-		command /find <text>:
-			trigger:
-				set {_where} to network server of arg-1
-				if {_where} is set:
-					send "%arg-1% is on %{_where}%."
-				else:
-					send "%arg-1% is not online."
+		send "%name of network player "Notch"%"
 		""")
-@Since("0.2.0")
-public class ExprPlayerServer extends SimpleExpression<String> {
+@Since("0.4.0")
+public class ExprNetworkPlayerDetail extends SimpleExpression<String> {
+
+	private static final int NAME = 0;
 
 	public static void register(@NotNull SyntaxRegistry registry) {
 		registry.register(SyntaxRegistry.EXPRESSION,
-				DefaultSyntaxInfos.Expression.builder(ExprPlayerServer.class, String.class)
-						.supplier(ExprPlayerServer::new)
+				DefaultSyntaxInfos.Expression.builder(ExprNetworkPlayerDetail.class, String.class)
+						.supplier(ExprNetworkPlayerDetail::new)
 						.addPatterns(
-								"network server of [network] [player[s]] %networkplayers%",
-								"%networkplayers%'[s] network server")
+								"[the] name[s] of network player[s] %networkplayers%",
+								"[the] (uuid[s]|unique id[s]) of network player[s] %networkplayers%")
 						.build());
 	}
 
 	private Expression<NetworkPlayer> players;
+	private int detail;
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean init(Expression<?>[] exprs, int matchedPattern, @NotNull Kleenean isDelayed,
 			@NotNull ParseResult result) {
 		players = (Expression<NetworkPlayer>) exprs[0];
+		detail = matchedPattern;
 		return true;
 	}
 
 	@Override
 	protected String @NotNull [] get(@NotNull Event event) {
-		SkNetworkSpigot plugin = SkNetworkSpigot.get();
-		if (plugin == null)
-			return new String[0];
-
 		List<String> found = new ArrayList<>();
 		for (NetworkPlayer player : players.getArray(event)) {
-			String name = player.name();
-			if (name == null)
-				continue;
-			String server = plugin.network().serverOf(name);
-			if (server != null)
-				found.add(server);
+			String value = detail == NAME ? NetworkPlayers.name(player) : uuid(player);
+			if (value != null)
+				found.add(value);
 		}
 		return found.toArray(new String[0]);
+	}
+
+	private static String uuid(NetworkPlayer player) {
+		UUID resolved = NetworkPlayers.uuid(player);
+		return resolved == null ? null : resolved.toString();
 	}
 
 	@Override
@@ -88,6 +85,7 @@ public class ExprPlayerServer extends SimpleExpression<String> {
 
 	@Override
 	public @NotNull String toString(@Nullable Event event, boolean debug) {
-		return "network server of " + players.toString(event, debug);
+		return (detail == NAME ? "name" : "uuid") + " of network player "
+				+ players.toString(event, debug);
 	}
 }
