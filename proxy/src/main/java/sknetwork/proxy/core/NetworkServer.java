@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import sknetwork.common.Frame;
 import sknetwork.common.Log;
 import sknetwork.common.MutationMode;
+import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
 import sknetwork.common.Protocol;
 import sknetwork.common.Manifest;
@@ -396,23 +397,19 @@ public final class NetworkServer {
 	}
 
 	void playerAction(BackendConnection origin, PlayerAction action, List<String> targets,
-			String payload) {
+			byte[] body) {
 		if (!players) {
 			log.debug("ignored " + action + " from " + origin.name() + ": player features are off");
 			return;
 		}
 
-		if (action == PlayerAction.CONNECT) {
-			ProxyActions platform = actions;
-			if (platform == null)
-				return;
-			for (String player : targets)
-				platform.connect(player, payload);
+		if (action.handledByProxy()) {
+			handleHere(action, targets, body);
 			return;
 		}
 
 		if (targets.isEmpty()) {
-			Frame frame = delivery(action, List.of(), payload);
+			Frame frame = delivery(action, List.of(), body);
 			for (BackendConnection connection : connections)
 				if (connection.isReady())
 					connection.send(frame);
@@ -422,16 +419,33 @@ public final class NetworkServer {
 		state.route(targets).forEach((server, holding) -> {
 			for (BackendConnection connection : connections)
 				if (connection.isReady() && connection.name().equals(server))
-					connection.send(delivery(action, holding, payload));
+					connection.send(delivery(action, holding, body));
 		});
 	}
 
-	private static Frame delivery(PlayerAction action, List<String> targets, String payload) {
+	private void handleHere(PlayerAction action, List<String> targets, byte[] body) {
+		ProxyActions platform = actions;
+		if (platform == null || action != PlayerAction.CONNECT)
+			return;
+
+		String server;
+		try {
+			server = new PacketIn(body == null ? new byte[0] : body).string();
+		} catch (IOException e) {
+			log.warn("could not read the server name from a connect request: " + e.getMessage());
+			return;
+		}
+
+		for (String player : targets)
+			platform.connect(player, server);
+	}
+
+	private static Frame delivery(PlayerAction action, List<String> targets, byte[] body) {
 		PacketOut out = new PacketOut(Protocol.PLAYER_DELIVERY)
 				.varInt(action.id())
 				.varInt(targets.size());
 		targets.forEach(out::string);
-		return out.string(payload).frame();
+		return out.nullableBytes(body).frame();
 	}
 
 	void consoleCommand(BackendConnection origin, List<String> servers, String command) {

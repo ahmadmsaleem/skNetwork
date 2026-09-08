@@ -205,7 +205,7 @@ final class FakeBackend implements AutoCloseable {
 				.varInt(action.id())
 				.varInt(targets.size());
 		targets.forEach(out::string);
-		out.string(payload).frame().write(this.out);
+		out.nullableBytes(PacketOut.body().string(payload).payload()).frame().write(this.out);
 	}
 
 	Delivery delivery() throws IOException {
@@ -215,7 +215,7 @@ final class FakeBackend implements AutoCloseable {
 		List<String> targets = new ArrayList<>(count);
 		for (int i = 0; i < count; i++)
 			targets.add(packet.string());
-		return new Delivery(action, targets, packet.string());
+		return new Delivery(action, targets, new PacketIn(packet.nullableBytes()).string());
 	}
 
 	void consoleCommand(List<String> servers, String command) throws IOException {

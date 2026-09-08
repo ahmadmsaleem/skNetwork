@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import ch.njol.skript.doc.Description;
@@ -70,21 +69,11 @@ public class EffNetworkMessage extends Effect {
 		if (plugin == null)
 			return;
 
-		List<String> to = names(targets, event);
+		List<String> to = NetworkTargets.names(targets, event);
 		for (Component message : messages.getArray(event))
-			plugin.playerAction(PlayerAction.MESSAGE, to, NetworkText.toJson(message));
+			plugin.playerAction(PlayerAction.MESSAGE, to, NetworkTargets.text(NetworkText.toJson(message)));
 	}
 
-	private static List<String> names(Expression<NetworkPlayer> targets, Event event) {
-		if (targets == null)
-			return List.of();
-
-		List<String> names = new ArrayList<>();
-		for (NetworkPlayer player : targets.getArray(event))
-			if (player.name() != null)
-				names.add(player.name());
-		return names;
-	}
 
 	@Override
 	public @NotNull String toString(@Nullable Event event, boolean debug) {
