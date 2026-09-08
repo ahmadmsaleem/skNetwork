@@ -73,6 +73,7 @@ Velocity 4.1.1.
 /sknetproxy                 proxy: state, backends, variable count
 /sknetproxy push            proxy: send scripts now
 /sknetproxy dump <pattern>  proxy: look up variables, '*' is a wildcard
+/sknetproxy reload          proxy: re-read config.yml, apply what can move
 ```
 
 The two halves use different names on purpose. A proxy handles any command it knows

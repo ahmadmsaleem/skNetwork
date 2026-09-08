@@ -18,7 +18,6 @@ record Outcome(Kind kind, String type, byte[] value, String display, String erro
 		return new Outcome(Kind.DELETE, null, null, null, null);
 	}
 
-	/** Legal, but there is nothing to write. */
 	static Outcome unchanged() {
 		return new Outcome(Kind.UNCHANGED, null, null, null, null);
 	}
@@ -31,7 +30,6 @@ record Outcome(Kind kind, String type, byte[] value, String display, String erro
 		return kind != Kind.REFUSED;
 	}
 
-	/** if anything actually has to be stored and broadcast. */
 	boolean changed() {
 		return kind == Kind.SET || kind == Kind.DELETE;
 	}

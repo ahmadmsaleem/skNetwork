@@ -88,6 +88,10 @@ final class NetworkState {
 		return servers.containsKey(server);
 	}
 
+	static Frame empty() {
+		return new PacketOut(Protocol.NETWORK_STATE).varInt(0).frame();
+	}
+
 	Frame frame() {
 		List<RemoteServer> copy = all();
 		PacketOut out = new PacketOut(Protocol.NETWORK_STATE).varInt(copy.size());

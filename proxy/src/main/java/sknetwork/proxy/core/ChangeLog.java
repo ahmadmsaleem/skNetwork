@@ -10,6 +10,8 @@ interface ChangeLog {
 
 	void append(long seq, String name, String type, byte[] value, String display);
 
+	void noPersist(NamePatterns patterns, VariableStore store, long seq);
+
 	void flush();
 
 	void maybeCompact(VariableStore store, long seq);

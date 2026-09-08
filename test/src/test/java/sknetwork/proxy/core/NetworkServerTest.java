@@ -82,7 +82,6 @@ class NetworkServerTest {
 		awaitWarning("use player UUIDs in variable names");
 	}
 
-	/** Naming the odd one out is the whole point, so the message has to carry it. */
 	@Test
 	void namesTheBackendThatDisagrees() throws IOException {
 		server.usePlayerUuids(true);
@@ -92,7 +91,6 @@ class NetworkServerTest {
 		awaitWarning("survival has 'use player UUIDs in variable names' set to false");
 	}
 
-	/** A mismatch is worth saying out loud, but it is not worth refusing the backend. */
 	@Test
 	void stillAcceptsABackendKeyingPlayersTheOtherWay() throws IOException {
 		server.usePlayerUuids(true);

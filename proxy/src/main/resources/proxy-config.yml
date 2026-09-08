@@ -4,6 +4,11 @@
 # Every backend points at this proxy with 'proxy.host', 'proxy.port' and
 # 'proxy.token' in its own plugins/skNetwork/config.yml. Those three have to agree
 # with what is set here or the backend never gets past the handshake.
+#
+# /sknetproxy reload re-reads this file and applies 'scripts.groups', 'no-persist',
+# 'debug', 'players', 'remote-commands' and the two 'scripts' size limits. It tells
+# you which of them moved. Everything else is owned by something already handed out
+# - an open socket, a handshake that has passed, an open file - and needs a restart.
 
 # ─── Connection ───────────────────────────────────────────────────────────────
 

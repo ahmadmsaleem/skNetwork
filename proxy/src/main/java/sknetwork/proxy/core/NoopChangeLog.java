@@ -15,6 +15,10 @@ final class NoopChangeLog implements ChangeLog {
 	}
 
 	@Override
+	public void noPersist(NamePatterns patterns, VariableStore store, long seq) {
+	}
+
+	@Override
 	public void flush() {
 	}
 

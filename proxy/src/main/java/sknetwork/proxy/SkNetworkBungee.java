@@ -47,11 +47,12 @@ public final class SkNetworkBungee extends Plugin {
 		}
 
 		ProxySettings settings = ProxySettings.from(new BungeeConfig(config));
-		Log log = bungeeLog(getLogger(), settings.debug());
+		Log log = bungeeLog(getLogger());
 
 		try {
 			server = ProxyBoot.start(settings, getDataFolder(), log);
 			server.actions(this::connect);
+			server.reloader(() -> ProxySettings.from(new BungeeConfig(loadConfig())));
 		} catch (IOException e) {
 			getLogger().severe("could not bind " + settings.bind() + ":" + settings.port()
 					+ " - " + e.getMessage());
@@ -66,7 +67,6 @@ public final class SkNetworkBungee extends Plugin {
 				+ " (protocol " + Protocol.VERSION + ") running as the PROXY half");
 	}
 
-	/** Moving a player between servers is the one thing only the proxy can do. */
 	private boolean connect(String player, String target) {
 		ProxiedPlayer moving = getProxy().getPlayer(player);
 		ServerInfo destination = getProxy().getServerInfo(target);
@@ -96,13 +96,9 @@ public final class SkNetworkBungee extends Plugin {
 	private final class SknetCommand extends Command {
 
 		private SknetCommand() {
-			// not "sknet": a proxy intercepts a command it knows, so that name has to
-			// stay free for the backend half, where an operator already has permission
 			super("sknetproxy", "sknetwork.admin", "sknetp", "sknp");
 		}
 
-		// BungeeCord deprecated its whole chat API in favour of Adventure, which it does
-		// not ship. fromLegacyText stays the only way to colour a line here.
 		@Override
 		@SuppressWarnings("deprecation")
 		public void execute(CommandSender sender, String[] args) {
@@ -113,7 +109,6 @@ public final class SkNetworkBungee extends Plugin {
 		}
 	}
 
-	/** BungeeCord's own {@code Configuration} already speaks dotted paths. */
 	private record BungeeConfig(Configuration config) implements ConfigSource {
 
 		@Override
@@ -148,7 +143,8 @@ public final class SkNetworkBungee extends Plugin {
 		}
 	}
 
-	private static Log bungeeLog(Logger logger, boolean debug) {
+	/** The debug gate lives in the core, because a reload can turn it on and off. */
+	private static Log bungeeLog(Logger logger) {
 		return new Log() {
 			@Override
 			public void info(String message) {
@@ -167,8 +163,7 @@ public final class SkNetworkBungee extends Plugin {
 
 			@Override
 			public void debug(String message) {
-				if (debug)
-					logger.info("[debug] " + message);
+				logger.info("[debug] " + message);
 			}
 		};
 	}
