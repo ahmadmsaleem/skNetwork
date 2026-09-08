@@ -12,6 +12,8 @@ import ch.njol.skript.util.Version;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 import ch.njol.skript.variables.Variables;
+import sknetwork.common.PingField;
+import sknetwork.common.PingSettings;
 import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
@@ -49,6 +51,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	private final Throttle playerKeyWarnings = new Throttle(60_000);
 	private final AtomicLong droppedWrites = new AtomicLong();
 	private volatile boolean warnedPrefixMismatch;
+	private volatile PingSettings ping = PingSettings.NONE;
 
 	public static SkNetworkSpigot get() {
 		return instance;
@@ -210,6 +213,19 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		return network;
 	}
 
+	/** What the proxy is answering server list pings with right now. */
+	public PingSettings ping() {
+		return ping;
+	}
+
+	void ping(PingSettings ping) {
+		this.ping = ping;
+	}
+
+	public boolean setPing(PingField field, String value) {
+		return client != null && client.sendPingSetting(field, value);
+	}
+
 	/** Tells the proxy what this server is and who is on it right now. */
 	void reportServerInfo() {
 		if (client == null)
@@ -297,6 +313,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 
 	void onDisconnected() {
 		network.clear();
+		ping = PingSettings.NONE;
 		fire(new NetworkDisconnectEvent());
 	}
 

@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import sknetwork.common.PingSettings;
+
 final class ConfigReload {
 
 	record Report(List<String> applied, List<String> restartNeeded, List<String> notes,
@@ -32,6 +34,7 @@ final class ConfigReload {
 		List<String> notes = new ArrayList<>();
 
 		flags(server, live, fresh, applied, notes);
+		ping(server, live, fresh, applied, notes);
 		noPersist(server, live, fresh, applied, notes);
 		scripts(server, live, fresh, applied, notes);
 
@@ -70,6 +73,21 @@ final class ConfigReload {
 					? "remote commands are on: a script on any backend now has console on all of them"
 					: "remote commands are off: further attempts are refused and logged");
 		}
+	}
+
+	private static void ping(NetworkServer server, ProxySettings live, ProxySettings fresh,
+			List<String> applied, List<String> notes) {
+		if (live.ping().equals(fresh.ping()))
+			return;
+
+		applied.add("ping");
+		server.applied(fresh);
+		server.broadcastPing();
+
+		PingSettings overridden = server.pingOverrides();
+		notes.add(overridden.isEmpty()
+				? "the server list ping now answers from config.yml"
+				: "scripts have set " + overridden.describe() + ", which still wins over config.yml");
 	}
 
 	private static void noPersist(NetworkServer server, ProxySettings live, ProxySettings fresh,

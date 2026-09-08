@@ -29,6 +29,8 @@ import sknetwork.common.PacketOut;
 import sknetwork.common.Protocol;
 import sknetwork.common.Manifest;
 import sknetwork.common.PlayerAction;
+import sknetwork.common.PingField;
+import sknetwork.common.PingSettings;
 import sknetwork.common.PlayerChange;
 import sknetwork.common.RemoteServer;
 import sknetwork.common.Style;
@@ -74,6 +76,7 @@ public final class NetworkServer {
 	private volatile ProxySettings booted;
 	private volatile ProxySettings applied;
 	private volatile ConfigReloader reloader;
+	private volatile PingState ping;
 	private volatile long backlogLimit = DEFAULT_BACKLOG_BYTES;
 	private volatile boolean players = true;
 	private volatile boolean remoteCommands;
@@ -162,6 +165,50 @@ public final class NetworkServer {
 
 	public boolean playersEnabled() {
 		return players;
+	}
+
+	void ping(PingState ping) {
+		this.ping = ping;
+	}
+
+	/** What the platform's ping handler should answer with, config fallback included. */
+	public PingSettings pingSettings() {
+		PingState state = ping;
+		ProxySettings current = applied;
+		if (state == null)
+			return current == null ? PingSettings.NONE : current.ping();
+		return state.effective(current == null ? PingSettings.NONE : current.ping());
+	}
+
+	void pingSet(BackendConnection origin, PingField field, String value) {
+		PingState state = ping;
+		if (state == null)
+			return;
+
+		state.set(field, value);
+		log.info("server list ping: " + origin.name() + (value == null
+				? " cleared " + field.name().toLowerCase(Locale.ROOT).replace('_', ' ')
+				: " set " + field.name().toLowerCase(Locale.ROOT).replace('_', ' ') + " to " + value));
+
+		broadcastPing();
+	}
+
+	PingSettings pingOverrides() {
+		PingState state = ping;
+		return state == null ? PingSettings.NONE : state.overrides();
+	}
+
+	void broadcastPing() {
+		Frame frame = pingFrame();
+		for (BackendConnection connection : connections)
+			if (connection.isReady())
+				connection.send(frame);
+	}
+
+	Frame pingFrame() {
+		PacketOut out = new PacketOut(Protocol.PING_STATE);
+		pingSettings().write(out);
+		return out.frame();
 	}
 
 	boolean persists() {
@@ -800,6 +847,7 @@ public final class NetworkServer {
 			target.send(current, new PacketOut(Protocol.SYNCED).int64(current).bool(false).frame());
 			target.markReady();
 			sendStateTo(target);
+			target.send(pingFrame());
 			pushTo(target);
 			log.info(target.name() + " resumed from seq " + lastSeq + ": " + replayed + " delta(s) replayed");
 			return;
@@ -829,6 +877,7 @@ public final class NetworkServer {
 
 		target.markReady();
 		sendStateTo(target);
+		target.send(pingFrame());
 		pushTo(target);
 		if (lastSeq > 0)
 			log.info(target.name() + " asked to resume from seq " + lastSeq

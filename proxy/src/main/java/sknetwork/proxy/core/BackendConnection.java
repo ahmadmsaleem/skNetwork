@@ -17,6 +17,7 @@ import sknetwork.common.Manifest;
 import sknetwork.common.MutationMode;
 import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
+import sknetwork.common.PingField;
 import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
@@ -213,6 +214,8 @@ final class BackendConnection {
 			case Protocol.SERVER_INFO -> server.serverInfo(this, RemoteServer.read(packet));
 			case Protocol.PLAYER_ACTION -> playerAction(packet);
 			case Protocol.CONSOLE_COMMAND -> consoleCommand(packet);
+			case Protocol.PING_SET -> server.pingSet(this,
+					PingField.byId((byte) packet.varInt()), packet.nullableString());
 			default -> server.log().warn("ignoring unexpected opcode 0x"
 					+ Integer.toHexString(frame.opcode & 0xFF) + " from " + name);
 		}

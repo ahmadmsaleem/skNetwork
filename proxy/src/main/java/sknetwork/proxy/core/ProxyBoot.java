@@ -26,6 +26,10 @@ public final class ProxyBoot {
 		// before start(), so the listening line and everything after it honour 'debug'
 		server.debugEnabled(settings.debug());
 		server.settings(settings);
+
+		PingState ping = new PingState(dataFolder, log);
+		ping.load();
+		server.ping(ping);
 		server.start();
 		server.features(settings.players(), settings.remoteCommands());
 		server.usePlayerUuids(settings.usePlayerUuids());
