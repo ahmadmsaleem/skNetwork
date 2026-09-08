@@ -171,13 +171,10 @@ public final class NetworkServer {
 		this.ping = ping;
 	}
 
-	/** What the platform's ping handler should answer with, config fallback included. */
+	/** What the platform's ping handler should answer with. Unset means leave it alone. */
 	public PingSettings pingSettings() {
 		PingState state = ping;
-		ProxySettings current = applied;
-		if (state == null)
-			return current == null ? PingSettings.NONE : current.ping();
-		return state.effective(current == null ? PingSettings.NONE : current.ping());
+		return state == null ? PingSettings.NONE : state.overrides();
 	}
 
 	void pingSet(BackendConnection origin, PingField field, String value) {
@@ -191,11 +188,6 @@ public final class NetworkServer {
 				: " set " + field.name().toLowerCase(Locale.ROOT).replace('_', ' ') + " to " + value));
 
 		broadcastPing();
-	}
-
-	PingSettings pingOverrides() {
-		PingState state = ping;
-		return state == null ? PingSettings.NONE : state.overrides();
 	}
 
 	void broadcastPing() {

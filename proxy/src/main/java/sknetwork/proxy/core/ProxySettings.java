@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 
 import sknetwork.common.Durations;
-import sknetwork.common.PingSettings;
 import sknetwork.common.Protocol;
 
 public record ProxySettings(String bind, int port, String token, boolean debug,
@@ -13,7 +12,7 @@ public record ProxySettings(String bind, int port, String token, boolean debug,
 		int replayBuffer,
 		boolean scriptsEnabled, Map<String, List<String>> groups,
 		long maxFileBytes, long maxTotalBytes, boolean players, boolean remoteCommands,
-		boolean usePlayerUuids, PingSettings ping) {
+		boolean usePlayerUuids) {
 
 	public static ProxySettings from(ConfigSource config) {
 		Map<String, List<String>> groups = new LinkedHashMap<>();
@@ -36,20 +35,7 @@ public record ProxySettings(String bind, int port, String token, boolean debug,
 				config.integer("scripts.max-total-mb", 16) * 1024L * 1024L,
 				config.flag("players", true),
 				config.flag("remote-commands", false),
-				config.flag("use player UUIDs in variable names", true),
-				new PingSettings(
-						legacy(config.string("ping.motd", null)),
-						blankToNull(config.string("ping.max-players", null)),
-						blankToNull(config.string("ping.player-count", null))));
-	}
-
-	private static String legacy(String value) {
-		String text = blankToNull(value);
-		return text == null ? null : text.replace('&', '\u00a7');
-	}
-
-	private static String blankToNull(String value) {
-		return value == null || value.isBlank() ? null : value;
+				config.flag("use player UUIDs in variable names", true));
 	}
 
 	/** Null, blank or "none" all mean keep nothing. */

@@ -33,17 +33,13 @@ class PingSettingsTest {
 		assertTrue(PingSettings.NONE.isEmpty());
 	}
 
-	/** A script beats config.yml, and config.yml fills in whatever the script left alone. */
 	@Test
-	void aScriptValueWinsAndTheConfigFillsTheRest() {
-		PingSettings script = new PingSettings(null, "500", null);
-		PingSettings config = new PingSettings("§afrom config", "20", "0");
+	void anUnsetFieldMeansLeaveThatPartOfThePingAlone() {
+		PingSettings ping = PingSettings.NONE.with(PingField.MAX_PLAYERS, "500");
 
-		PingSettings effective = script.over(config);
-
-		assertEquals("§afrom config", effective.motd());
-		assertEquals("500", effective.maxPlayers());
-		assertEquals("0", effective.playerCount());
+		assertNull(ping.motd());
+		assertNull(ping.get(PingField.PLAYER_COUNT));
+		assertEquals(500, ping.number(PingField.MAX_PLAYERS));
 	}
 
 	@Test

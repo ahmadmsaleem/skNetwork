@@ -22,7 +22,7 @@ import sknetwork.spigot.SkNetworkSpigot;
 @Description("""
 		What the proxy answers server list pings with, for everyone looking at the network in their server list.
 		Setting one sends it to the proxy, which answers every ping from then on without asking any server. Reads come from this server's own copy.
-		A value set here outlives a proxy restart. Reset one to fall back to `ping` in the proxy's config.yml, and if nothing is set there either the proxy answers as it normally would.
+		A value set here outlives a proxy restart. Reset one and the proxy answers that part of the ping exactly as it would without skNetwork.
 		
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")

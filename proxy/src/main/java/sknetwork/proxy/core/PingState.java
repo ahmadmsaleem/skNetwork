@@ -29,10 +29,6 @@ final class PingState {
 		return overrides;
 	}
 
-	PingSettings effective(PingSettings configured) {
-		return overrides.over(configured);
-	}
-
 	synchronized void set(PingField field, String value) {
 		overrides = overrides.with(field, value == null || value.isBlank() ? null : value);
 		save();

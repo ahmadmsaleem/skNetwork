@@ -121,26 +121,6 @@ players: true
 # this is off unless you turn it on deliberately.
 remote-commands: false
 
-# ─── Server list ping ─────────────────────────────────────────────────────────
-
-# What this proxy answers server list pings with, for anyone looking at the
-# network from their server list.
-#
-# A script sets these while the network runs, with 'set network motd to ...'.
-# What a script sets wins over what is written here and outlives a proxy restart,
-# because it is kept in ping.properties beside this file. 'reset network motd'
-# throws that away and falls back to this file again.
-#
-# Leave one blank and, with no script having set it either, the proxy answers
-# that part of the ping exactly as it would without skNetwork.
-#
-# The proxy answers out of memory, so a ping never waits on a backend and none of
-# this stops working when every backend is down.
-ping:
-  motd: ""
-  max-players: ""
-  player-count: ""
-
 # ─── Variable names ───────────────────────────────────────────────────────────
 
 # What Skript's option of the same name should be on every backend.

@@ -22,14 +22,6 @@ public record PingSettings(String motd, String maxPlayers, String playerCount) {
 		};
 	}
 
-	/** @return this where it has a value, and {@code fallback} everywhere else */
-	public PingSettings over(PingSettings fallback) {
-		return new PingSettings(
-				motd != null ? motd : fallback.motd(),
-				maxPlayers != null ? maxPlayers : fallback.maxPlayers(),
-				playerCount != null ? playerCount : fallback.playerCount());
-	}
-
 	public boolean isEmpty() {
 		return motd == null && maxPlayers == null && playerCount == null;
 	}
@@ -44,21 +36,6 @@ public record PingSettings(String motd, String maxPlayers, String playerCount) {
 		} catch (NumberFormatException e) {
 			return null;
 		}
-	}
-
-	/** The fields that have a value, for a log line or a console reply. */
-	public String describe() {
-		StringBuilder out = new StringBuilder();
-		for (PingField field : PingField.values()) {
-			String value = get(field);
-			if (value == null)
-				continue;
-			if (!out.isEmpty())
-				out.append(", ");
-			out.append(field.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'))
-					.append('=').append(value);
-		}
-		return out.isEmpty() ? "nothing" : out.toString();
 	}
 
 	public void write(PacketOut out) {
