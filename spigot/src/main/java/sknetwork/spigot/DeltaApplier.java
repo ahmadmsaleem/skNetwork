@@ -19,6 +19,7 @@ import sknetwork.common.NetworkSound;
 import sknetwork.common.NetworkTabList;
 import sknetwork.common.NetworkTitle;
 import sknetwork.common.PacketIn;
+import sknetwork.common.PingSettings;
 import sknetwork.common.Protocol;
 import sknetwork.common.PlayerAction;
 import sknetwork.common.PlayerChange;
@@ -204,6 +205,10 @@ final class DeltaApplier extends BukkitRunnable {
 			}
 			case Protocol.PLAYER_DELIVERY -> {
 				deliver(packet);
+				return 1;
+			}
+			case Protocol.PING_STATE -> {
+				plugin.ping(PingSettings.read(packet));
 				return 1;
 			}
 			case Protocol.PLAYER_EVENT -> {

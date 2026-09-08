@@ -16,6 +16,8 @@ import org.bstats.charts.SingleLineChart;
 import sknetwork.common.Log;
 import sknetwork.common.Protocol;
 import sknetwork.common.SkNetwork;
+import sknetwork.common.PingField;
+import sknetwork.common.PingSettings;
 import sknetwork.common.Style;
 import sknetwork.proxy.core.ConfigSource;
 import sknetwork.proxy.core.NetworkServer;
@@ -27,7 +29,10 @@ import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
+import net.md_5.bungee.api.event.ProxyPingEvent;
+import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
+import net.md_5.bungee.event.EventHandler;
 import net.md_5.bungee.config.Configuration;
 import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
@@ -62,6 +67,7 @@ public final class SkNetworkBungee extends Plugin {
 
 		startMetrics();
 		getProxy().getPluginManager().registerCommand(this, new SknetCommand());
+		getProxy().getPluginManager().registerListener(this, new PingListener());
 
 		getLogger().info(SkNetwork.NAME + " " + getDescription().getVersion()
 				+ " (protocol " + Protocol.VERSION + ") running as the PROXY half");
@@ -75,6 +81,35 @@ public final class SkNetworkBungee extends Plugin {
 
 		moving.connect(destination);
 		return true;
+	}
+
+	/** Answered from what the proxy already holds, so a ping never waits on a backend. */
+	public final class PingListener implements Listener {
+
+		@EventHandler
+		@SuppressWarnings("deprecation")
+		public void onPing(ProxyPingEvent event) {
+			if (server == null)
+				return;
+
+			PingSettings ping = server.pingSettings();
+			net.md_5.bungee.api.ServerPing response = event.getResponse();
+			if (response == null)
+				return;
+
+			if (ping.motd() != null)
+				response.setDescriptionComponent(new TextComponent(
+						TextComponent.fromLegacyText(ping.motd())));
+
+			Integer max = ping.number(PingField.MAX_PLAYERS);
+			Integer online = ping.number(PingField.PLAYER_COUNT);
+			if (response.getPlayers() != null) {
+				if (max != null)
+					response.getPlayers().setMax(max);
+				if (online != null)
+					response.getPlayers().setOnline(online);
+			}
+		}
 	}
 
 	private void startMetrics() {

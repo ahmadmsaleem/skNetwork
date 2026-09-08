@@ -17,6 +17,7 @@ import sknetwork.common.Frame;
 import sknetwork.common.MutationMode;
 import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
+import sknetwork.common.PingField;
 import sknetwork.common.PlayerAction;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
@@ -191,6 +192,13 @@ final class ProxyClient {
 	}
 
 	/** @param targets empty means every player on the network */
+	boolean sendPingSetting(PingField field, String value) {
+		return send(new PacketOut(Protocol.PING_SET)
+				.varInt(field.id())
+				.nullableString(value)
+				.frame());
+	}
+
 	boolean sendPlayerAction(PlayerAction action, List<String> targets, byte[] body) {
 		PacketOut out = new PacketOut(Protocol.PLAYER_ACTION)
 				.varInt(action.id())

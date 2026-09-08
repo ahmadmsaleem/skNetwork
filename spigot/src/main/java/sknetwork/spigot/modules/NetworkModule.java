@@ -32,6 +32,7 @@ import sknetwork.spigot.elements.expressions.ExprAtomicResult;
 import sknetwork.spigot.elements.expressions.ExprChangedVariable;
 import sknetwork.spigot.elements.expressions.ExprEventNetworkServer;
 import sknetwork.spigot.elements.expressions.ExprNetworkPlayer;
+import sknetwork.spigot.elements.expressions.ExprNetworkPing;
 import sknetwork.spigot.elements.expressions.ExprNetworkPlayerDetail;
 import sknetwork.spigot.elements.expressions.ExprNetworkPlayers;
 import sknetwork.spigot.elements.expressions.ExprNetworkServers;
@@ -84,6 +85,7 @@ public final class NetworkModule implements AddonModule {
 		ExprServerWhitelist.register(registry);
 		ExprChangedVariable.register(registry);
 		ExprEventNetworkServer.register(registry);
+		ExprNetworkPing.register(registry);
 
 		registerEvents();
 	}

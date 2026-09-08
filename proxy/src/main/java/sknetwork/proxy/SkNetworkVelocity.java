@@ -13,11 +13,13 @@ import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.event.proxy.ProxyPingEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
+import com.velocitypowered.api.proxy.server.ServerPing;
 
 import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
@@ -29,6 +31,8 @@ import org.spongepowered.configurate.serialize.SerializationException;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import sknetwork.common.Log;
+import sknetwork.common.PingField;
+import sknetwork.common.PingSettings;
 import sknetwork.common.Protocol;
 import sknetwork.common.SkNetwork;
 import sknetwork.proxy.core.ConfigSource;
