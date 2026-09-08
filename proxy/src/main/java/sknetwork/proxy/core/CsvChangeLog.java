@@ -141,7 +141,7 @@ final class CsvChangeLog implements ChangeLog {
 					}
 				}
 
-				highWater = Math.max(highWater, seq);git
+				highWater = Math.max(highWater, seq);
 				dataLines++;
 			}
 
