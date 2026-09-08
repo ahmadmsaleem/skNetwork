@@ -92,7 +92,6 @@ public final class SkNetworkBungee extends Plugin {
 		getLogger().info(SkNetwork.NAME + " stopped");
 	}
 
-	/** {@code /sknetproxy} on the proxy console. */
 	private final class SknetCommand extends Command {
 
 		private SknetCommand() {

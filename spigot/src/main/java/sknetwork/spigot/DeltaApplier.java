@@ -1,7 +1,9 @@
 package sknetwork.spigot;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
 import java.util.Set;
@@ -13,9 +15,14 @@ import sknetwork.common.MutationMode;
 import sknetwork.common.PacketIn;
 import sknetwork.common.Protocol;
 import sknetwork.common.PlayerAction;
+import sknetwork.common.PlayerChange;
 import sknetwork.common.Throttle;
 import sknetwork.common.VariableName;
+import sknetwork.spigot.elements.events.NetworkPlayerJoinEvent;
+import sknetwork.spigot.elements.events.NetworkPlayerQuitEvent;
+import sknetwork.spigot.elements.events.NetworkServerSwitchEvent;
 import sknetwork.spigot.elements.events.NetworkVariableChangeEvent;
+import sknetwork.spigot.elements.types.NetworkPlayer;
 import sknetwork.spigot.elements.types.AtomicResult;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -191,6 +198,10 @@ final class DeltaApplier extends BukkitRunnable {
 				deliver(packet);
 				return 1;
 			}
+			case Protocol.PLAYER_EVENT -> {
+				playerEvents(packet);
+				return 1;
+			}
 			case Protocol.CONSOLE_COMMAND -> {
 				String command = packet.string();
 				plugin.getLogger().info("running '" + command + "' for the network");
@@ -217,6 +228,31 @@ final class DeltaApplier extends BukkitRunnable {
 						+ Integer.toHexString(frame.opcode & 0xFF) + " from the proxy");
 				return 1;
 			}
+		}
+	}
+
+	private void playerEvents(PacketIn packet) throws IOException {
+		int count = packet.varInt();
+		if (count < 0 || count > 100_000)
+			throw new IOException("player change count " + count + " is out of range");
+
+		List<PlayerChange> changes = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+			changes.add(PlayerChange.read(packet));
+
+		if (!plugin.isSynced())
+			return;
+
+		for (PlayerChange change : changes) {
+			NetworkPlayer player = NetworkPlayer.named(change.player());
+			if (player == null)
+				continue;
+
+			org.bukkit.Bukkit.getPluginManager().callEvent(switch (change.kind()) {
+				case JOIN -> new NetworkPlayerJoinEvent(player, change.to());
+				case QUIT -> new NetworkPlayerQuitEvent(player, change.from());
+				case SWITCH -> new NetworkServerSwitchEvent(player, change.from(), change.to());
+			});
 		}
 	}
 
