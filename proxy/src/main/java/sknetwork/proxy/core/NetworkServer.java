@@ -32,6 +32,7 @@ import sknetwork.common.PlayerAction;
 import sknetwork.common.PingField;
 import sknetwork.common.PingSettings;
 import sknetwork.common.PlayerChange;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.RemoteServer;
 import sknetwork.common.Style;
 import sknetwork.common.VariableEntry;
@@ -396,6 +397,45 @@ public final class NetworkServer {
 		synchronized (stateLock) {
 			broadcastPlayerEvents(state.sweep());
 		}
+	}
+
+	void playerProperties(BackendConnection origin, List<PlayerProperties> incoming) {
+		if (!players)
+			return;
+
+		List<PlayerProperties> changed;
+		synchronized (stateLock) {
+			changed = state.merge(incoming);
+		}
+		if (changed.isEmpty())
+			return;
+
+		Frame frame = propertiesFrame(changed);
+		for (BackendConnection connection : connections)
+			if (connection.isReady())
+				connection.send(frame);
+
+		log.debug(origin.name() + " reported " + changed.size() + " changed player detail(s) of "
+				+ incoming.size() + " sent");
+	}
+
+	private static Frame propertiesFrame(List<PlayerProperties> rows) {
+		PacketOut out = new PacketOut(Protocol.PLAYER_PROPERTIES).varInt(rows.size());
+		for (PlayerProperties row : rows)
+			row.write(out);
+		return out.frame();
+	}
+
+	void sendPropertiesTo(BackendConnection target) {
+		if (!players)
+			return;
+
+		List<PlayerProperties> all;
+		synchronized (stateLock) {
+			all = state.propertiesNow();
+		}
+		if (!all.isEmpty())
+			target.send(propertiesFrame(all));
 	}
 
 	private void broadcastPlayerEvents(List<PlayerChange> changes) {
@@ -840,6 +880,7 @@ public final class NetworkServer {
 			target.markReady();
 			sendStateTo(target);
 			target.send(pingFrame());
+			sendPropertiesTo(target);
 			pushTo(target);
 			log.info(target.name() + " resumed from seq " + lastSeq + ": " + replayed + " delta(s) replayed");
 			return;
@@ -870,6 +911,7 @@ public final class NetworkServer {
 		target.markReady();
 		sendStateTo(target);
 		target.send(pingFrame());
+		sendPropertiesTo(target);
 		pushTo(target);
 		if (lastSeq > 0)
 			log.info(target.name() + " asked to resume from seq " + lastSeq

@@ -2,7 +2,10 @@ package sknetwork.spigot;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -15,6 +18,7 @@ import ch.njol.skript.variables.Variables;
 import sknetwork.common.PingField;
 import sknetwork.common.PingSettings;
 import sknetwork.common.PlayerAction;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
 import sknetwork.common.SkNetwork;
@@ -40,6 +44,8 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 
 	private static final Version OLDEST_SKRIPT = new Version(2, 16, 0);
 
+	private static final int KEYFRAME_EVERY = 12;
+
 	private SkNetworkConfig config;
 	private ProxyClient client;
 	private DeltaApplier applier;
@@ -52,6 +58,9 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	private final AtomicLong droppedWrites = new AtomicLong();
 	private volatile boolean warnedPrefixMismatch;
 	private volatile PingSettings ping = PingSettings.NONE;
+
+	private final Map<String, PlayerProperties> lastReported = new HashMap<>();
+	private int heartbeats;
 
 	public static SkNetworkSpigot get() {
 		return instance;
@@ -113,7 +122,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		getCommand("sknet").setExecutor(new SknetCommand(this));
 		Skript.instance().registerAddon(SkNetworkSpigot.class, "skNetwork")
 				.loadModules(new NetworkModule());
-		getServer().getScheduler().runTaskTimer(this, () -> client.ping(), 100L, 100L);
+		getServer().getScheduler().runTaskTimer(this, this::heartbeat, 100L, 100L);
 
 		// Skript loads its variables in its own onEnable, which has not run yet
 		getServer().getScheduler().runTask(this, this::reportStorageState);
@@ -224,6 +233,53 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 
 	public boolean setPing(PingField field, String value) {
 		return client != null && client.sendPingSetting(field, value);
+	}
+
+	/**
+	 * Five details for every player every five seconds would be the bulk of this
+	 * plugin's traffic on a busy network, so only what moved is sent. An address
+	 * never changes while somebody is connected, a locale and a display name almost
+	 * never do, and playtime is a baseline every reader counts up from on its own,
+	 * which leaves ping as the only field that really moves.
+	 */
+	private void heartbeat() {
+		client.ping();
+		reportPlayerProperties();
+	}
+
+	private void reportPlayerProperties() {
+		if (client == null || !isSynced())
+			return;
+
+		boolean keyframe = ++heartbeats % KEYFRAME_EVERY == 0;
+		List<PlayerProperties> changed = new ArrayList<>();
+		List<String> online = new ArrayList<>();
+
+		for (Player player : getServer().getOnlinePlayers()) {
+			String key = player.getName().toLowerCase(Locale.ROOT);
+			online.add(key);
+
+			PlayerProperties now = describe(player);
+			PlayerProperties sent = lastReported.get(key);
+			if (keyframe || now.differsFrom(sent)) {
+				changed.add(now);
+				lastReported.put(key, now);
+			}
+		}
+		lastReported.keySet().retainAll(online);
+
+		if (!changed.isEmpty())
+			client.sendPlayerProperties(changed);
+	}
+
+	private PlayerProperties describe(Player player) {
+		String address = player.getAddress() == null || player.getAddress().getAddress() == null
+				? null
+				: player.getAddress().getAddress().getHostAddress();
+
+		return new PlayerProperties(player.getName(), player.getPing(), address,
+				NetworkText.toLegacy(player.displayName()), player.locale().toString(),
+				player.getStatistic(org.bukkit.Statistic.PLAY_ONE_MINUTE));
 	}
 
 	/** Tells the proxy what this server is and who is on it right now. */

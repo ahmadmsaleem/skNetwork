@@ -34,6 +34,7 @@ import sknetwork.spigot.elements.expressions.ExprEventNetworkServer;
 import sknetwork.spigot.elements.expressions.ExprNetworkPlayer;
 import sknetwork.spigot.elements.expressions.ExprNetworkPing;
 import sknetwork.spigot.elements.expressions.ExprNetworkPlayerDetail;
+import sknetwork.spigot.elements.expressions.ExprNetworkPlayerProperty;
 import sknetwork.spigot.elements.expressions.ExprNetworkPlayers;
 import sknetwork.spigot.elements.expressions.ExprNetworkServers;
 import sknetwork.spigot.elements.expressions.ExprPlayerServer;
@@ -79,6 +80,7 @@ public final class NetworkModule implements AddonModule {
 		ExprNetworkPlayer.register(registry);
 		ExprNetworkPlayers.register(registry);
 		ExprNetworkPlayerDetail.register(registry);
+		ExprNetworkPlayerProperty.register(registry);
 		ExprPlayerServer.register(registry);
 		ExprServerDetail.register(registry);
 		ExprServerMaxPlayers.register(registry);
