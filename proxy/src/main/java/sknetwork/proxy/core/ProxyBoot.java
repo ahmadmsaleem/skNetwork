@@ -27,6 +27,9 @@ public final class ProxyBoot {
 		NetworkServer server = new NetworkServer(settings.bind(), settings.port(), settings.token(),
 				logFile, settings.flushIntervalMs(), settings.compactRatio(), noPersist,
 				settings.replayBuffer(), log);
+		// before start(), so the listening line and everything after it honour 'debug'
+		server.debugEnabled(settings.debug());
+		server.settings(settings);
 		server.start();
 		server.features(settings.players(), settings.remoteCommands());
 		server.usePlayerUuids(settings.usePlayerUuids());
@@ -42,8 +45,6 @@ public final class ProxyBoot {
 			File dataFolder, Log log) {
 		ScriptLibrary library = new ScriptLibrary(dataFolder, log,
 				settings.maxFileBytes(), settings.maxTotalBytes());
-		// made whether or not the feature is on: an empty scripts/ with a README beside
-		// config.yml is how anybody finds out this exists at all
 		library.ensureFolder();
 
 		if (!settings.scriptsEnabled()) {

@@ -44,7 +44,7 @@ public final class NetworkServer {
 	private final String bindHost;
 	private final int port;
 	private final String token;
-	private final Log log;
+	private final ProxyLog log;
 	private final VariableStore store = new VariableStore();
 	private final ChangeLog changeLog;
 	private final boolean persists;
@@ -69,6 +69,9 @@ public final class NetworkServer {
 
 	private final Object stateLock = new Object();
 	private volatile ProxyActions actions;
+	private volatile ProxySettings booted;
+	private volatile ProxySettings applied;
+	private volatile ConfigReloader reloader;
 	private volatile long backlogLimit = DEFAULT_BACKLOG_BYTES;
 	private volatile boolean players = true;
 	private volatile boolean remoteCommands;
@@ -89,7 +92,7 @@ public final class NetworkServer {
 		this.bindHost = bindHost;
 		this.port = port;
 		this.token = token;
-		this.log = log;
+		this.log = new ProxyLog(log);
 		this.flushIntervalMs = flushIntervalMs;
 		this.replayCapacity = Math.max(replayCapacity, 0);
 		this.persists = logFile != null;
@@ -101,6 +104,45 @@ public final class NetworkServer {
 
 	public Log log() {
 		return log;
+	}
+
+	void debugEnabled(boolean debug) {
+		log.debugEnabled(debug);
+	}
+
+	ProxySettings bootSettings() {
+		return booted;
+	}
+
+	ProxySettings settings() {
+		return applied;
+	}
+
+	void settings(ProxySettings settings) {
+		this.booted = settings;
+		this.applied = settings;
+	}
+
+	void applied(ProxySettings settings) {
+		this.applied = settings;
+	}
+
+	public void reloader(ConfigReloader reloader) {
+		this.reloader = reloader;
+	}
+
+	ConfigReload.Report reload() {
+		ConfigReloader source = reloader;
+		if (source == null)
+			return ConfigReload.Report.failed("this proxy was started without a way to re-read its config");
+
+		ProxySettings fresh;
+		try {
+			fresh = source.reread();
+		} catch (IOException | RuntimeException e) {
+			return ConfigReload.Report.failed(e.getMessage() == null ? e.toString() : e.getMessage());
+		}
+		return ConfigReload.apply(this, fresh);
 	}
 
 	public void scripts(ScriptLibrary library) {
@@ -118,6 +160,27 @@ public final class NetworkServer {
 
 	public boolean playersEnabled() {
 		return players;
+	}
+
+	boolean persists() {
+		return persists;
+	}
+
+	String logName() {
+		return logName;
+	}
+
+	void noPersist(NamePatterns patterns) {
+		changeLog.noPersist(patterns, store, sequence.get());
+	}
+
+	void refreshState() {
+		synchronized (stateLock) {
+			Frame frame = players ? state.frame() : NetworkState.empty();
+			for (BackendConnection connection : connections)
+				if (connection.isReady())
+					connection.send(frame);
+		}
 	}
 
 	long backlogLimit() {

@@ -31,6 +31,7 @@ public final class SknetConsole {
 			case "log" -> logStatus(server, version, reply);
 			case "compact" -> compact(server, reply);
 			case "backup" -> backup(server, reply);
+			case "reload" -> reload(server, version, reply);
 			case "" -> status(server, version, reply);
 			case "resync", "reconnect" -> {
 				reply.accept(Style.header(version, Protocol.VERSION));
@@ -131,6 +132,39 @@ public final class SknetConsole {
 		reply.accept(Style.hint(COMMAND + " push", "send scripts now"));
 		reply.accept(Style.hint(COMMAND + " dump <name>", "look up a variable, '*' is a wildcard"));
 		reply.accept(Style.hint(COMMAND + " log", "storage, compaction and backups"));
+		reply.accept(Style.hint(COMMAND + " reload", "re-read config.yml"));
+	}
+
+	private static void reload(NetworkServer server, String version, Consumer<String> reply) {
+		ConfigReload.Report report = server.reload();
+
+		reply.accept(Style.header(version, Protocol.VERSION));
+		reply.accept(Style.gap());
+
+		if (report.failed()) {
+			reply.accept(Style.rowRaw("Reload", Style.BAD + "failed"));
+			reply.accept(Style.note(report.error()));
+			reply.accept(Style.note("nothing was changed - the proxy is still running the old config"));
+			reply.accept(Style.gap());
+			return;
+		}
+
+		if (report.nothingChanged()) {
+			reply.accept(Style.rowRaw("Reload", Style.GOOD + "config.yml already matches what is running"));
+		} else {
+			if (!report.applied().isEmpty())
+				reply.accept(Style.rowRaw("Reloaded",
+						Style.GOOD + String.join(", ", report.applied())));
+			if (!report.restartNeeded().isEmpty()) {
+				reply.accept(Style.rowRaw("Unchanged",
+						Style.WARN + String.join(", ", report.restartNeeded())));
+				reply.accept(Style.note("restart the proxy to apply those"));
+			}
+		}
+
+		for (String note : report.notes())
+			reply.accept(Style.note(note));
+		reply.accept(Style.gap());
 	}
 
 	private static void logStatus(NetworkServer server, String version, Consumer<String> reply) {

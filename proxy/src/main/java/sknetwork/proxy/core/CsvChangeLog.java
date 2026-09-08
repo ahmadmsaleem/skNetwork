@@ -56,7 +56,7 @@ final class CsvChangeLog implements ChangeLog {
 	private final File backup;
 	private final File temp;
 	private final double compactRatio;
-	private final NamePatterns noPersist;
+	private volatile NamePatterns noPersist;
 	private final Log log;
 
 	private Writer out;
@@ -205,6 +205,19 @@ final class CsvChangeLog implements ChangeLog {
 			log.error("could not append to " + file.getName() + " - the change is live in memory "
 					+ "but will not survive a restart", e);
 		}
+	}
+
+	/**
+	 * Rewriting is the whole point. A pattern added at runtime has to take the
+	 * matching lines off the disk that are already there, backup included, or a
+	 * secret stays readable in network.csv until two compactions have gone by. A
+	 * pattern removed has the mirror image: those values are live in memory but
+	 * absent from the file, and only a rewrite from memory puts them back.
+	 */
+	@Override
+	public synchronized void noPersist(NamePatterns patterns, VariableStore store, long seq) {
+		this.noPersist = patterns;
+		compact(store, seq, true);
 	}
 
 	@Override
