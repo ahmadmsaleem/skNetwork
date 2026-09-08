@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import ch.njol.skript.doc.Description;
@@ -40,7 +39,7 @@ public class EffNetworkActionBar extends Effect {
 				.supplier(EffNetworkActionBar::new)
 				.addPatterns(
 						"send network action[ ]bar %objects% to network player[s] %networkplayers%",
-						"send network action[ ]bar %objects% to [the] [whole] network")
+						"send network action[ ]bar %objects% (across|to) [the] [whole] network")
 				.build());
 	}
 
@@ -65,21 +64,11 @@ public class EffNetworkActionBar extends Effect {
 		if (plugin == null)
 			return;
 
-		List<String> to = names(targets, event);
+		List<String> to = NetworkTargets.names(targets, event);
 		for (Component line : text.getArray(event))
-			plugin.playerAction(PlayerAction.ACTION_BAR, to, NetworkText.toJson(line));
+			plugin.playerAction(PlayerAction.ACTION_BAR, to, NetworkTargets.text(NetworkText.toJson(line)));
 	}
 
-	private static List<String> names(Expression<NetworkPlayer> targets, Event event) {
-		if (targets == null)
-			return List.of();
-
-		List<String> names = new ArrayList<>();
-		for (NetworkPlayer player : targets.getArray(event))
-			if (player.name() != null)
-				names.add(player.name());
-		return names;
-	}
 
 	@Override
 	public @NotNull String toString(@Nullable Event event, boolean debug) {

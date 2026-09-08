@@ -197,8 +197,8 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	}
 
 	/** @param targets empty for every player on the network */
-	public boolean playerAction(PlayerAction action, List<String> targets, String payload) {
-		return client != null && client.sendPlayerAction(action, targets, payload);
+	public boolean playerAction(PlayerAction action, List<String> targets, byte[] body) {
+		return client != null && client.sendPlayerAction(action, targets, body);
 	}
 
 	/** @param servers empty for every server on the network */

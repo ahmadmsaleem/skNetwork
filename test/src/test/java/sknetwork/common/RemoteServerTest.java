@@ -69,7 +69,10 @@ class RemoteServerTest {
 		assertEquals(0, PlayerAction.MESSAGE.ordinal());
 		assertEquals(1, PlayerAction.ACTION_BAR.ordinal());
 		assertEquals(2, PlayerAction.CONNECT.ordinal());
-		assertEquals(3, PlayerAction.values().length);
+		assertEquals(3, PlayerAction.TITLE.ordinal());
+		assertEquals(4, PlayerAction.SOUND.ordinal());
+		assertEquals(5, PlayerAction.TAB_LIST.ordinal());
+		assertEquals(6, PlayerAction.values().length);
 	}
 
 	@Test

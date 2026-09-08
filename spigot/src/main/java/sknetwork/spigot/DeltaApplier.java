@@ -1,6 +1,7 @@
 package sknetwork.spigot;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -12,6 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import sknetwork.common.Frame;
 import sknetwork.common.Manifest;
 import sknetwork.common.MutationMode;
+import net.kyori.adventure.title.Title;
+import net.kyori.adventure.title.Title.Times;
+import sknetwork.common.NetworkSound;
+import sknetwork.common.NetworkTabList;
+import sknetwork.common.NetworkTitle;
 import sknetwork.common.PacketIn;
 import sknetwork.common.Protocol;
 import sknetwork.common.PlayerAction;
@@ -30,6 +36,8 @@ import org.bukkit.scheduler.BukkitRunnable;
 final class DeltaApplier extends BukkitRunnable {
 
 	private static final int PER_TICK = 2_000;
+
+	private static final String EMPTY_JSON = "{\"text\":\"\"}";
 
 	private final SkNetworkSpigot plugin;
 	private final Queue<Frame> inbound;
@@ -262,21 +270,50 @@ final class DeltaApplier extends BukkitRunnable {
 		Set<String> named = new HashSet<>();
 		for (int i = 0; i < count; i++)
 			named.add(packet.string().toLowerCase(Locale.ROOT));
-		String payload = packet.string();
+		byte[] body = packet.nullableBytes();
+		if (body == null)
+			return;
 
 		if (named.isEmpty() && action == PlayerAction.MESSAGE)
-			plugin.getServer().getConsoleSender().sendMessage(NetworkText.fromJson(payload));
+			plugin.getServer().getConsoleSender()
+					.sendMessage(NetworkText.fromJson(new PacketIn(body).string()));
 
 		for (Player player : plugin.getServer().getOnlinePlayers()) {
 			if (!named.isEmpty() && !named.contains(player.getName().toLowerCase(Locale.ROOT)))
 				continue;
-			switch (action) {
-				case MESSAGE -> player.sendMessage(NetworkText.fromJson(payload));
-				case ACTION_BAR -> player.sendActionBar(NetworkText.fromJson(payload));
-				default -> {
-				}
+			apply(player, action, new PacketIn(body));
+		}
+	}
+
+	private void apply(Player player, PlayerAction action, PacketIn body) throws IOException {
+		switch (action) {
+			case MESSAGE -> player.sendMessage(NetworkText.fromJson(body.string()));
+			case ACTION_BAR -> player.sendActionBar(NetworkText.fromJson(body.string()));
+			case TITLE -> {
+				NetworkTitle title = NetworkTitle.read(body);
+				player.showTitle(Title.title(
+						NetworkText.fromJson(title.title() == null ? EMPTY_JSON : title.title()),
+						NetworkText.fromJson(title.subtitle() == null ? EMPTY_JSON : title.subtitle()),
+						Times.times(ticks(title.fadeIn()), ticks(title.stay()), ticks(title.fadeOut()))));
+			}
+			case SOUND -> {
+				NetworkSound sound = NetworkSound.read(body);
+				player.playSound(player.getLocation(), sound.key(), sound.volume(), sound.pitch());
+			}
+			case TAB_LIST -> {
+				NetworkTabList tab = NetworkTabList.read(body);
+				if (tab.header() != null)
+					player.sendPlayerListHeader(NetworkText.fromJson(tab.header()));
+				if (tab.footer() != null)
+					player.sendPlayerListFooter(NetworkText.fromJson(tab.footer()));
+			}
+			default -> {
 			}
 		}
+	}
+
+	private static Duration ticks(int ticks) {
+		return Duration.ofMillis(Math.max(ticks, 0) * 50L);
 	}
 
 	/** @return how many were dropped */

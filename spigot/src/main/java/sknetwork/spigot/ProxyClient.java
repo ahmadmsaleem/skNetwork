@@ -191,12 +191,12 @@ final class ProxyClient {
 	}
 
 	/** @param targets empty means every player on the network */
-	boolean sendPlayerAction(PlayerAction action, List<String> targets, String payload) {
+	boolean sendPlayerAction(PlayerAction action, List<String> targets, byte[] body) {
 		PacketOut out = new PacketOut(Protocol.PLAYER_ACTION)
 				.varInt(action.id())
 				.varInt(targets.size());
 		targets.forEach(out::string);
-		return send(out.string(payload).frame());
+		return send(out.nullableBytes(body).frame());
 	}
 
 	/** @param servers empty means every server on the network */

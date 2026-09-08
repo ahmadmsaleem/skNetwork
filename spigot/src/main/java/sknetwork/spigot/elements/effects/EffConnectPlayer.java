@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import ch.njol.skript.doc.Description;
@@ -60,19 +59,9 @@ public class EffConnectPlayer extends Effect {
 		if (plugin == null || server == null)
 			return;
 
-		plugin.playerAction(PlayerAction.CONNECT, names(players, event), server);
+		plugin.playerAction(PlayerAction.CONNECT, NetworkTargets.names(players, event), NetworkTargets.text(server));
 	}
 
-	private static List<String> names(Expression<NetworkPlayer> targets, Event event) {
-		if (targets == null)
-			return List.of();
-
-		List<String> names = new ArrayList<>();
-		for (NetworkPlayer player : targets.getArray(event))
-			if (player.name() != null)
-				names.add(player.name());
-		return names;
-	}
 
 	@Override
 	public @NotNull String toString(@Nullable Event event, boolean debug) {
