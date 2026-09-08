@@ -6,10 +6,6 @@ import java.io.IOException;
 import sknetwork.common.Log;
 
 public final class ProxyBoot {
-	/**
-	 * @return the started server
-	 * @throws IOException if the socket cannot be bound, in which case nothing is running
-	 */
 	public static NetworkServer start(ProxySettings settings, File dataFolder, Log log)
 			throws IOException {
 		if (settings.tokenIsExposedDefault())

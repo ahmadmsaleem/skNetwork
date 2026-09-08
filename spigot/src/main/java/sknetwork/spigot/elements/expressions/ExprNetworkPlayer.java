@@ -26,7 +26,7 @@ import sknetwork.spigot.elements.types.NetworkPlayer;
 		set {_who} to network player "Notch"
 		send network message "&aHello." to {_who}
 		""")
-@Since("0.4.0")
+@Since("1.0.0")
 public class ExprNetworkPlayer extends SimpleExpression<NetworkPlayer> {
 
 	public static void register(@NotNull SyntaxRegistry registry) {

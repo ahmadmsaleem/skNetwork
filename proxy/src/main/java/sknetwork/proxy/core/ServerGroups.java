@@ -10,7 +10,6 @@ import java.util.Set;
 
 public final class ServerGroups {
 
-	/** Reaches every connected server and cannot be redefined. */
 	public static final String GLOBAL = "global";
 
 	private static final String GROUP_SUFFIX = "/";

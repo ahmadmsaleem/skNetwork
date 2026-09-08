@@ -5,10 +5,6 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Fired on every server the moment a network variable changes, including the one
- * that wrote it. The name carries no prefix, the way it travels on the wire.
- */
 public class NetworkVariableChangeEvent extends Event {
 
 	private static final HandlerList HANDLERS = new HandlerList();

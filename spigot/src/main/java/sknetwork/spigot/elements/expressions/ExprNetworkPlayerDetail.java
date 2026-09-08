@@ -30,7 +30,7 @@ import sknetwork.spigot.elements.types.NetworkPlayers;
 @Example("""
 		send "%name of network player "Notch"%"
 		""")
-@Since("0.4.0")
+@Since("1.0.0")
 public class ExprNetworkPlayerDetail extends SimpleExpression<String> {
 
 	private static final int NAME = 0;

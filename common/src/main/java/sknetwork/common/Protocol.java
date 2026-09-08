@@ -4,7 +4,7 @@ package sknetwork.common;
 public final class Protocol {
 
 	/** Bump this whenever a frame changes shape. Checked during HELLO. */
-	public static final int VERSION = 9;
+	public static final int VERSION = 10;
 
 
 	public static final int DEFAULT_PORT = 25580;
@@ -52,6 +52,8 @@ public final class Protocol {
 	public static final byte PLAYER_DELIVERY = 0x63;
 	/** server -> proxy -> server: run a command on a console. */
 	public static final byte CONSOLE_COMMAND = 0x64;
+	/** proxy -> server: who joined, left or moved since the last state. */
+	public static final byte PLAYER_EVENT = 0x65;
 
 	private Protocol() {
 	}

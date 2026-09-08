@@ -207,13 +207,6 @@ final class CsvChangeLog implements ChangeLog {
 		}
 	}
 
-	/**
-	 * Rewriting is the whole point. A pattern added at runtime has to take the
-	 * matching lines off the disk that are already there, backup included, or a
-	 * secret stays readable in network.csv until two compactions have gone by. A
-	 * pattern removed has the mirror image: those values are live in memory but
-	 * absent from the file, and only a rewrite from memory puts them back.
-	 */
 	@Override
 	public synchronized void noPersist(NamePatterns patterns, VariableStore store, long seq) {
 		this.noPersist = patterns;

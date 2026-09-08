@@ -27,7 +27,7 @@ import sknetwork.spigot.elements.types.NetworkPlayer;
 		if network player "Notch" is online:
 			send network message "&aWelcome back." to network player "Notch"
 		""")
-@Since("0.4.0")
+@Since("1.0.0")
 public class CondNetworkPlayerOnline extends Condition {
 
 	public static void register(@NotNull SyntaxRegistry registry) {

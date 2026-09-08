@@ -97,13 +97,9 @@ public class EffAtomic extends Effect {
 		}
 
 		variable = raw;
-		// a literal arrives as UnparsedLiteral and throws on getSingle unless converted
-		// at parse time. this is Skript's supported way.
 		value = LiteralUtils.defendExpression(matchedPattern <= 1 || matchedPattern == 4
 				? exprs[0]
 				: exprs[1]);
-		// pattern 3 carries the value to compare against, pattern 4 the floor. both ride
-		// the same two wire fields, because to the proxy both are "the condition".
 		expected = matchedPattern == 3 || matchedPattern == 4
 				? LiteralUtils.defendExpression(exprs[2])
 				: null;
@@ -121,8 +117,6 @@ public class EffAtomic extends Effect {
 		};
 
 		waiting = result.hasTag("wait");
-		// everything after this runs on a later tick, and Skript has to know that before
-		// it parses the next line
 		if (waiting)
 			getParser().setHasDelayBefore(Kleenean.TRUE);
 		return true;
@@ -160,11 +154,7 @@ public class EffAtomic extends Effect {
 
 		Object locals = Variables.removeLocals(event);
 
-		// called exactly once, always on the main thread. a refusal, a timeout and a lost
-		// proxy all arrive here, so the trigger cannot be stranded.
 		plugin.atomic(change, result -> {
-			// Skript's own Delay refuses to resume during shutdown, for the same reason:
-			// this would run script code against half-disabled plugins
 			if (!Skript.getInstance().isEnabled())
 				return;
 
@@ -179,10 +169,7 @@ public class EffAtomic extends Effect {
 		return null;
 	}
 
-	/** @return null when the value cannot be serialised, which is already logged */
 	private @Nullable AtomicChange build(Event event, SkNetworkSpigot plugin) {
-		// the name as typed, so it has to be lowercased the way Skript does for a plain set,
-		// or {?coins::%player%} atomically and {?coins::%player%} plainly are two keys
 		String local = SkriptBridge.normalize(variable.getName().toString(event));
 
 		Object single = value.getSingle(event);

@@ -28,6 +28,7 @@ import sknetwork.common.PacketOut;
 import sknetwork.common.Protocol;
 import sknetwork.common.Manifest;
 import sknetwork.common.PlayerAction;
+import sknetwork.common.PlayerChange;
 import sknetwork.common.RemoteServer;
 import sknetwork.common.Style;
 import sknetwork.common.VariableEntry;
@@ -248,6 +249,9 @@ public final class NetworkServer {
 		long interval = Math.max(flushIntervalMs, 1);
 		flusher.scheduleWithFixedDelay(changeLog::flush, interval, interval, TimeUnit.MILLISECONDS);
 
+		long sweep = Math.max(NetworkState.SWITCH_GRACE_MS / 4, 1);
+		flusher.scheduleWithFixedDelay(this::sweepPlayerEvents, sweep, sweep, TimeUnit.MILLISECONDS);
+
 		log.info("listening on " + bindHost + ":" + port);
 	}
 
@@ -333,8 +337,10 @@ public final class NetworkServer {
 	void unregister(BackendConnection connection) {
 		connections.remove(connection);
 		synchronized (stateLock) {
-			if (state.remove(connection, connection.name()))
+			if (state.remove(connection, connection.name())) {
 				broadcastState();
+				broadcastPlayerEvents(state.drain());
+			}
 		}
 	}
 
@@ -342,7 +348,33 @@ public final class NetworkServer {
 		synchronized (stateLock) {
 			state.put(origin, info);
 			broadcastState();
+			broadcastPlayerEvents(state.drain());
 		}
+	}
+
+	private void sweepPlayerEvents() {
+		synchronized (stateLock) {
+			broadcastPlayerEvents(state.sweep());
+		}
+	}
+
+	private void broadcastPlayerEvents(List<PlayerChange> changes) {
+		if (!players || changes.isEmpty())
+			return;
+
+		PacketOut out = new PacketOut(Protocol.PLAYER_EVENT).varInt(changes.size());
+		for (PlayerChange change : changes)
+			change.write(out);
+
+		Frame frame = out.frame();
+		for (BackendConnection connection : connections)
+			if (connection.isReady())
+				connection.send(frame);
+
+		for (PlayerChange change : changes)
+			log.debug(change.kind() + " " + change.player()
+					+ (change.from() == null ? "" : " from " + change.from())
+					+ (change.to() == null ? "" : " to " + change.to()));
 	}
 
 	private void broadcastState() {
