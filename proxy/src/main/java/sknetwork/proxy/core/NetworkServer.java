@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -858,6 +859,28 @@ public final class NetworkServer {
 			replay.removeFirst();
 	}
 
+	/** Exactly what {@link PacketOut} will write for one snapshot entry. */
+	static int entrySize(Map.Entry<String, VariableEntry> entry) {
+		VariableEntry variable = entry.getValue();
+		return stringSize(entry.getKey())
+				+ 1 + (variable.type == null ? 0 : stringSize(variable.type))
+				+ 1 + (variable.value == null ? 0 : varIntSize(variable.value.length) + variable.value.length);
+	}
+
+	private static int stringSize(String value) {
+		int length = value.getBytes(StandardCharsets.UTF_8).length;
+		return varIntSize(length) + length;
+	}
+
+	private static int varIntSize(int value) {
+		int size = 1;
+		while ((value & ~0x7F) != 0) {
+			value >>>= 7;
+			size++;
+		}
+		return size;
+	}
+
 	private void sync(BackendConnection target, long lastSeq) {
 		long current = sequence.get();
 
@@ -889,19 +912,26 @@ public final class NetworkServer {
 		List<Map.Entry<String, VariableEntry>> pending = store.entries();
 		int start = 0;
 		while (start < pending.size()) {
-			PacketOut entries = new PacketOut(Protocol.SNAPSHOT);
+			PacketOut entries = PacketOut.body();
 			int end = start;
-			while (end < pending.size() && end - start < SNAPSHOT_CHUNK
-					&& (end == start || entries.size() < SNAPSHOT_CHUNK_BYTES)) {
-				Map.Entry<String, VariableEntry> entry = pending.get(end++);
+			while (end < pending.size() && end - start < SNAPSHOT_CHUNK) {
+				Map.Entry<String, VariableEntry> entry = pending.get(end);
+
+				// measured before it is appended, not after: a value landing on a nearly
+				// full chunk would otherwise carry the frame past the cap, and a backend
+				// that cannot read its snapshot reconnects into the same one for ever
+				if (end > start && entries.size() + entrySize(entry) > SNAPSHOT_CHUNK_BYTES)
+					break;
+
 				entries.string(entry.getKey())
 						.nullableString(entry.getValue().type)
 						.nullableBytes(entry.getValue().value);
+				end++;
 			}
 
 			target.send(new PacketOut(Protocol.SNAPSHOT)
 					.varInt(end - start)
-					.raw(entries.frame().payload)
+					.raw(entries.payload())
 					.frame());
 			start = end;
 		}
