@@ -651,6 +651,113 @@ class NetworkServerTest {
 	}
 
 	@Test
+	void doesNotResumeABackendAcrossARestartThatDroppedNoPersistKeys() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		FakeBackend lobby = synced("lobby");
+		lobby.set("coins", "long", Numbers.writeLong(100));
+		lobby.set("session::a", "string", new byte[] {1});
+		lobby.set("coins", "long", Numbers.writeLong(200));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		assertEquals(1, server.variableCount());
+		assertEquals(3, server.sequence());
+
+		FakeBackend.Sync sync = connect("lobby", TOKEN, Protocol.VERSION, 3).sync();
+
+		assertFalse(sync.resumed(), "a caught up backend still holds the dropped session key");
+		assertTrue(sync.fullSnapshot());
+		assertEquals(List.of("coins"), sync.snapshot());
+	}
+
+	@Test
+	void leavesTwoBackendsAgreeingAfterARestartThatDroppedKeys() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		FakeBackend lobby = synced("lobby");
+		lobby.set("coins", "long", Numbers.writeLong(100));
+		lobby.set("session::a", "string", new byte[] {1});
+		lobby.set("coins", "long", Numbers.writeLong(200));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		List<String> caughtUp = connect("lobby", TOKEN, Protocol.VERSION, 3).sync().snapshot();
+		List<String> fresh = connect("survival", TOKEN, Protocol.VERSION, 0).sync().snapshot();
+
+		assertEquals(fresh, caughtUp);
+	}
+
+	@Test
+	void doesNotResumeABackendAcrossARestartThatSkippedAnUnreadableLine() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		Files.writeString(logFile.toPath(), """
+				# skNetwork v2 seq=0
+				1, coins, long, 0000000000000064, 100
+				2, lost, long, ZZZZ, x
+				3, other, long, 0000000000000001, 1
+				""", StandardCharsets.UTF_8);
+
+		server.stop();
+		server = start(logFile, 10_000);
+
+		assertEquals(2, server.variableCount());
+		assertEquals(3, server.sequence());
+
+		FakeBackend.Sync sync = connect("lobby", TOKEN, Protocol.VERSION, 3).sync();
+
+		assertFalse(sync.resumed(), "the skipped line is a key the backend may still hold");
+		assertTrue(sync.fullSnapshot());
+		awaitWarning("unreadable line");
+	}
+
+	@Test
+	void stillResumesAcrossARestartWhenNothingCouldHaveBeenDropped() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000);
+
+		synced("lobby").set("coins", "long", Numbers.writeLong(100));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000);
+		FakeBackend.Sync sync = connect("lobby", TOKEN, Protocol.VERSION, 1).sync();
+
+		assertTrue(sync.resumed(), "a clean log has nothing to put right, so resuming is still free");
+		assertFalse(sync.fullSnapshot());
+	}
+
+	@Test
+	void resumesOnceThatBackendHasHadItsSnapshot() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		synced("lobby").set("coins", "long", Numbers.writeLong(100));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		assertFalse(connect("lobby", TOKEN, Protocol.VERSION, 1).sync().resumed());
+		assertTrue(connect("lobby", TOKEN, Protocol.VERSION, 1).sync().resumed(),
+				"the second connection in this run has already been put right");
+	}
+
+	@Test
 	void keepsCountingFromWhereTheLogLeftOff() throws IOException {
 		File logFile = new File(folder, "network.csv");
 		server.stop();
@@ -809,6 +916,26 @@ class NetworkServerTest {
 			for (int i = 0; i < 16; i++)
 				lobby.take();
 		});
+	}
+
+	private NetworkServer start(File logFile, int replayCapacity, NamePatterns noPersist)
+			throws IOException {
+		BindException lost = null;
+
+		for (int attempt = 0; attempt < 20; attempt++) {
+			int candidate = freePort();
+			NetworkServer started = new NetworkServer("127.0.0.1", candidate, TOKEN, logFile, 10, 2.0,
+					noPersist, replayCapacity, log);
+			try {
+				started.start();
+				port = candidate;
+				return started;
+			} catch (BindException taken) {
+				lost = taken;
+				started.stop();
+			}
+		}
+		throw lost;
 	}
 
 	private NetworkServer start(File logFile, int replayCapacity) throws IOException {

@@ -64,6 +64,7 @@ final class CsvChangeLog implements ChangeLog {
 	private boolean dirty;
 	private volatile long lastCompaction;
 	private volatile long lastFlush;
+	private volatile boolean mayBeMissingKeys;
 
 	CsvChangeLog(File file, double compactRatio, Log log) {
 		this(file, compactRatio, NamePatterns.none(), log);
@@ -89,6 +90,7 @@ final class CsvChangeLog implements ChangeLog {
 
 		long highWater = 0;
 		dataLines = 0;
+		mayBeMissingKeys = !noPersist.isEmpty();
 
 		if (source.isFile()) {
 			List<String> lines = Files.readAllLines(source.toPath(), StandardCharsets.UTF_8);
@@ -144,6 +146,8 @@ final class CsvChangeLog implements ChangeLog {
 				highWater = Math.max(highWater, seq);
 				dataLines++;
 			}
+
+			mayBeMissingKeys |= broken > 0 || source == backup;
 
 			if (broken > 0)
 				log.warn("skipped " + broken + " unreadable line(s) in " + source.getName());
@@ -224,6 +228,11 @@ final class CsvChangeLog implements ChangeLog {
 		} catch (IOException e) {
 			log.error("could not flush " + file.getName(), e);
 		}
+	}
+
+	@Override
+	public boolean mayBeMissingKeys() {
+		return mayBeMissingKeys;
 	}
 
 	@Override
