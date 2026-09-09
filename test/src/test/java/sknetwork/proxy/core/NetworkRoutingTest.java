@@ -120,10 +120,28 @@ class NetworkRoutingTest {
 		FakeBackend lobby = synced("lobby");
 		FakeBackend survival = synced("survival");
 
-		lobby.playerAction(PlayerAction.MESSAGE, List.of(), "{\"text\":\"all\"}");
+		lobby.everyone(PlayerAction.MESSAGE, "{\"text\":\"all\"}");
 
-		assertEquals("{\"text\":\"all\"}", lobby.delivery().payload());
+		FakeBackend.Delivery delivered = lobby.delivery();
+		assertEquals("{\"text\":\"all\"}", delivered.payload());
+		assertTrue(delivered.everyone(), "a deliberate broadcast is marked as one");
 		assertEquals("{\"text\":\"all\"}", survival.delivery().payload());
+	}
+
+	@Test
+	void doesNotBroadcastAnActionWhoseTargetsAllResolvedToNothing() throws IOException {
+		FakeBackend lobby = synced("lobby");
+		FakeBackend survival = synced("survival");
+		lobby.sendServerInfo(new RemoteServer("lobby", "m", "v", 20, List.of("eult"), List.of()));
+		lobby.networkState();
+		survival.networkState();
+
+		lobby.playerAction(PlayerAction.MESSAGE, false, List.of(), "{\"text\":\"leak\"}");
+
+		assertFalse(lobby.sawDeliveryBeforePong(7),
+				"an action that named players but resolved none must not reach the sender");
+		assertFalse(survival.sawDeliveryBeforePong(8),
+				"an action that named players but resolved none must not reach anybody else");
 	}
 
 	@Test

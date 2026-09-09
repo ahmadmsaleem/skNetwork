@@ -13,11 +13,13 @@ import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.event.proxy.ProxyPingEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
+import com.velocitypowered.api.proxy.server.ServerPing;
 
 import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
@@ -29,6 +31,8 @@ import org.spongepowered.configurate.serialize.SerializationException;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import sknetwork.common.Log;
+import sknetwork.common.PingField;
+import sknetwork.common.PingSettings;
 import sknetwork.common.Protocol;
 import sknetwork.common.SkNetwork;
 import sknetwork.proxy.core.ConfigSource;
@@ -39,7 +43,6 @@ import sknetwork.proxy.core.SknetConsole;
 
 public final class SkNetworkVelocity {
 
-	/** Velocity speaks Adventure, so the shared legacy strings are converted here. */
 	private static final LegacyComponentSerializer LEGACY =
 			LegacyComponentSerializer.builder().character('\u00a7').hexColors().build();
 
@@ -71,11 +74,12 @@ public final class SkNetworkVelocity {
 		}
 
 		ProxySettings settings = ProxySettings.from(new NodeConfig(config));
-		Log log = velocityLog(logger, settings.debug());
+		Log log = velocityLog(logger);
 
 		try {
 			server = ProxyBoot.start(settings, dataDirectory.toFile(), log);
 			server.actions(this::connect);
+			server.reloader(() -> ProxySettings.from(new NodeConfig(loadConfig())));
 		} catch (IOException e) {
 			logger.error("could not bind {}:{} - {}", settings.bind(), settings.port(), e.getMessage());
 			server = null;
@@ -92,8 +96,6 @@ public final class SkNetworkVelocity {
 				SkNetwork.NAME, version(), Protocol.VERSION);
 	}
 
-	/** Same charts as the BungeeCord half, so the two pages read the same way. */
-	/** Moving a player between servers is the one thing only the proxy can do. */
 	private boolean connect(String player, String target) {
 		Optional<Player> moving = proxy.getPlayer(player);
 		Optional<RegisteredServer> destination = proxy.getServer(target);
@@ -113,6 +115,30 @@ public final class SkNetworkVelocity {
 	}
 
 	@Subscribe
+	public void onProxyPing(ProxyPingEvent event) {
+		if (server == null)
+			return;
+
+		PingSettings ping = server.pingSettings();
+		if (ping.isEmpty())
+			return;
+
+		ServerPing.Builder response = event.getPing().asBuilder();
+		if (ping.motd() != null)
+			response.description(LEGACY.deserialize(ping.motd()));
+
+		Integer max = ping.number(PingField.MAX_PLAYERS);
+		if (max != null)
+			response.maximumPlayers(max);
+
+		Integer online = ping.number(PingField.PLAYER_COUNT);
+		if (online != null)
+			response.onlinePlayers(online);
+
+		event.setPing(response.build());
+	}
+
+	@Subscribe
 	public void onProxyShutdown(ProxyShutdownEvent event) {
 		if (server != null)
 			server.stop();
@@ -125,7 +151,6 @@ public final class SkNetworkVelocity {
 				.orElse("unknown");
 	}
 
-	/** {@code /sknet} on the proxy console. */
 	private final class SknetCommand implements SimpleCommand {
 
 		@Override
@@ -140,7 +165,6 @@ public final class SkNetworkVelocity {
 		}
 	}
 
-	/** Configurate walks a path segment at a time rather than by a dotted string. */
 	private record NodeConfig(ConfigurationNode root) implements ConfigSource {
 
 		private ConfigurationNode at(String path) {
@@ -149,8 +173,6 @@ public final class SkNetworkVelocity {
 
 		@Override
 		public String string(String path, String fallback) {
-			// not getString(fallback): Configurate rejects a null default, and
-			// 'flush-interval' has one so Durations can fall back to its own
 			String value = at(path).getString();
 			return value == null ? fallback : value;
 		}
@@ -183,8 +205,6 @@ public final class SkNetworkVelocity {
 			try {
 				return new ArrayList<>(at(path).getList(String.class, List.of()));
 			} catch (SerializationException e) {
-				// a group written as a map rather than a list. the startup warning about
-				// an undefined group is what the admin will see next
 				return List.of();
 			}
 		}
@@ -204,7 +224,7 @@ public final class SkNetworkVelocity {
 		return YamlConfigurationLoader.builder().path(file).build().load();
 	}
 
-	private static Log velocityLog(Logger logger, boolean debug) {
+	private static Log velocityLog(Logger logger) {
 		return new Log() {
 			@Override
 			public void info(String message) {
@@ -223,8 +243,7 @@ public final class SkNetworkVelocity {
 
 			@Override
 			public void debug(String message) {
-				if (debug)
-					logger.info("[debug] {}", message);
+				logger.info("[debug] {}", message);
 			}
 		};
 	}

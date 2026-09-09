@@ -1,7 +1,10 @@
 package sknetwork.spigot;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
 import java.util.Set;
@@ -10,12 +13,24 @@ import java.util.concurrent.ConcurrentHashMap;
 import sknetwork.common.Frame;
 import sknetwork.common.Manifest;
 import sknetwork.common.MutationMode;
+import net.kyori.adventure.title.Title;
+import net.kyori.adventure.title.Title.Times;
+import sknetwork.common.NetworkSound;
+import sknetwork.common.NetworkTabList;
+import sknetwork.common.NetworkTitle;
 import sknetwork.common.PacketIn;
+import sknetwork.common.PingSettings;
 import sknetwork.common.Protocol;
 import sknetwork.common.PlayerAction;
+import sknetwork.common.PlayerChange;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.Throttle;
 import sknetwork.common.VariableName;
+import sknetwork.spigot.elements.events.NetworkPlayerJoinEvent;
+import sknetwork.spigot.elements.events.NetworkPlayerQuitEvent;
+import sknetwork.spigot.elements.events.NetworkServerSwitchEvent;
 import sknetwork.spigot.elements.events.NetworkVariableChangeEvent;
+import sknetwork.spigot.elements.types.NetworkPlayer;
 import sknetwork.spigot.elements.types.AtomicResult;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -23,6 +38,8 @@ import org.bukkit.scheduler.BukkitRunnable;
 final class DeltaApplier extends BukkitRunnable {
 
 	private static final int PER_TICK = 2_000;
+
+	private static final String EMPTY_JSON = "{\"text\":\"\"}";
 
 	private final SkNetworkSpigot plugin;
 	private final Queue<Frame> inbound;
@@ -191,6 +208,25 @@ final class DeltaApplier extends BukkitRunnable {
 				deliver(packet);
 				return 1;
 			}
+			case Protocol.PLAYER_PROPERTIES -> {
+				int count = packet.varInt();
+				if (count < 0 || count > 100_000)
+					throw new IOException("player detail count " + count + " is out of range");
+
+				List<PlayerProperties> rows = new ArrayList<>(count);
+				for (int i = 0; i < count; i++)
+					rows.add(PlayerProperties.read(packet));
+				plugin.network().properties(rows);
+				return 1;
+			}
+			case Protocol.PING_STATE -> {
+				plugin.ping(PingSettings.read(packet));
+				return 1;
+			}
+			case Protocol.PLAYER_EVENT -> {
+				playerEvents(packet);
+				return 1;
+			}
 			case Protocol.CONSOLE_COMMAND -> {
 				String command = packet.string();
 				plugin.getLogger().info("running '" + command + "' for the network");
@@ -220,27 +256,82 @@ final class DeltaApplier extends BukkitRunnable {
 		}
 	}
 
+	private void playerEvents(PacketIn packet) throws IOException {
+		int count = packet.varInt();
+		if (count < 0 || count > 100_000)
+			throw new IOException("player change count " + count + " is out of range");
+
+		List<PlayerChange> changes = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+			changes.add(PlayerChange.read(packet));
+
+		if (!plugin.isSynced())
+			return;
+
+		for (PlayerChange change : changes) {
+			NetworkPlayer player = NetworkPlayer.named(change.player());
+			if (player == null)
+				continue;
+
+			org.bukkit.Bukkit.getPluginManager().callEvent(switch (change.kind()) {
+				case JOIN -> new NetworkPlayerJoinEvent(player, change.to());
+				case QUIT -> new NetworkPlayerQuitEvent(player, change.from());
+				case SWITCH -> new NetworkServerSwitchEvent(player, change.from(), change.to());
+			});
+		}
+	}
+
 	private void deliver(PacketIn packet) throws IOException {
 		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
+		boolean everyone = packet.bool();
 		int count = packet.varInt();
 		Set<String> named = new HashSet<>();
 		for (int i = 0; i < count; i++)
 			named.add(packet.string().toLowerCase(Locale.ROOT));
-		String payload = packet.string();
+		byte[] body = packet.nullableBytes();
+		if (body == null || (!everyone && named.isEmpty()))
+			return;
 
-		if (named.isEmpty() && action == PlayerAction.MESSAGE)
-			plugin.getServer().getConsoleSender().sendMessage(NetworkText.fromJson(payload));
+		if (everyone && action == PlayerAction.MESSAGE)
+			plugin.getServer().getConsoleSender()
+					.sendMessage(NetworkText.fromJson(new PacketIn(body).string()));
 
 		for (Player player : plugin.getServer().getOnlinePlayers()) {
-			if (!named.isEmpty() && !named.contains(player.getName().toLowerCase(Locale.ROOT)))
+			if (!everyone && !named.contains(player.getName().toLowerCase(Locale.ROOT)))
 				continue;
-			switch (action) {
-				case MESSAGE -> player.sendMessage(NetworkText.fromJson(payload));
-				case ACTION_BAR -> player.sendActionBar(NetworkText.fromJson(payload));
-				default -> {
-				}
+			apply(player, action, new PacketIn(body));
+		}
+	}
+
+	private void apply(Player player, PlayerAction action, PacketIn body) throws IOException {
+		switch (action) {
+			case MESSAGE -> player.sendMessage(NetworkText.fromJson(body.string()));
+			case ACTION_BAR -> player.sendActionBar(NetworkText.fromJson(body.string()));
+			case TITLE -> {
+				NetworkTitle title = NetworkTitle.read(body);
+				player.showTitle(Title.title(
+						NetworkText.fromJson(title.title() == null ? EMPTY_JSON : title.title()),
+						NetworkText.fromJson(title.subtitle() == null ? EMPTY_JSON : title.subtitle()),
+						Times.times(ticks(title.fadeIn()), ticks(title.stay()), ticks(title.fadeOut()))));
+			}
+			case SOUND -> {
+				NetworkSound sound = NetworkSound.read(body);
+				player.playSound(player.getLocation(), sound.key(), sound.volume(), sound.pitch());
+			}
+			case TAB_LIST -> {
+				NetworkTabList tab = NetworkTabList.read(body);
+				if (tab.header() != null)
+					player.sendPlayerListHeader(NetworkText.fromJson(tab.header()));
+				if (tab.footer() != null)
+					player.sendPlayerListFooter(NetworkText.fromJson(tab.footer()));
+			}
+			default -> {
 			}
 		}
+	}
+
+	private static Duration ticks(int ticks) {
+		return Duration.ofMillis(Math.max(ticks, 0) * 50L);
 	}
 
 	/** @return how many were dropped */

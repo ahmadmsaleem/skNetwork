@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.List;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -17,6 +16,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.common.PlayerAction;
 import sknetwork.spigot.SkNetworkSpigot;
+import sknetwork.spigot.elements.types.NetworkPlayer;
 
 @Name("Connect Network Player")
 @Description("""
@@ -27,7 +27,7 @@ import sknetwork.spigot.SkNetworkSpigot;
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")
 @Example("""
-		connect network player "%player%" to "survival"
+		connect network player player to "survival"
 		""")
 @Since("0.2.0")
 public class EffConnectPlayer extends Effect {
@@ -35,18 +35,18 @@ public class EffConnectPlayer extends Effect {
 	public static void register(@NotNull SyntaxRegistry registry) {
 		registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffConnectPlayer.class)
 				.supplier(EffConnectPlayer::new)
-				.addPatterns("(connect|send) network player[s] %strings% to [server] %string%")
+				.addPatterns("(connect|send) network player[s] %networkplayers% to [server] %string%")
 				.build());
 	}
 
-	private Expression<String> players;
+	private Expression<NetworkPlayer> players;
 	private Expression<String> target;
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean init(Expression<?>[] exprs, int matchedPattern, @NotNull Kleenean isDelayed,
 			@NotNull ParseResult result) {
-		players = (Expression<String>) exprs[0];
+		players = (Expression<NetworkPlayer>) exprs[0];
 		target = (Expression<String>) exprs[1];
 		return true;
 	}
@@ -58,8 +58,10 @@ public class EffConnectPlayer extends Effect {
 		if (plugin == null || server == null)
 			return;
 
-		plugin.playerAction(PlayerAction.CONNECT, List.of(players.getArray(event)), server);
+		plugin.playerAction(PlayerAction.CONNECT, false, NetworkTargets.of(players, event).names(),
+				NetworkTargets.text(server));
 	}
+
 
 	@Override
 	public @NotNull String toString(@Nullable Event event, boolean debug) {

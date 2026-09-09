@@ -10,10 +10,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import sknetwork.spigot.SkriptBridge;
 
-/**
- * Filters the change event by name at parse time, so a script asking about one
- * branch is not woken by every write on the network.
- */
 public class EvtNetworkVariable extends SkriptEvent {
 
 	private Pattern wanted;
@@ -25,7 +21,6 @@ public class EvtNetworkVariable extends SkriptEvent {
 
 		Object glob = args[0].getSingle();
 		if (glob != null)
-			// names arrive lowercased, so "Coins::*" typed here has to match "coins::x"
 			wanted = compile(SkriptBridge.normalize(glob.toString()));
 		return true;
 	}
@@ -42,7 +37,6 @@ public class EvtNetworkVariable extends SkriptEvent {
 		return "network variable change" + (wanted == null ? "" : " of " + wanted.pattern());
 	}
 
-	/** Same rule as {@code /sknetproxy dump}: only {@code *} is a wildcard. */
 	private static Pattern compile(String glob) {
 		StringBuilder regex = new StringBuilder();
 		int from = 0;

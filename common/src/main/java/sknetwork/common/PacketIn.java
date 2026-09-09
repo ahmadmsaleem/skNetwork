@@ -22,6 +22,10 @@ public final class PacketIn {
 		return in.readLong();
 	}
 
+	public float float32() throws IOException {
+		return in.readFloat();
+	}
+
 	public boolean bool() throws IOException {
 		return in.readBoolean();
 	}

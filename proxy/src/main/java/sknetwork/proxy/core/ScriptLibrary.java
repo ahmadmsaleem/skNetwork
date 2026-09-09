@@ -23,21 +23,16 @@ public final class ScriptLibrary {
 	private final File root;
 	private final File versionFile;
 	private final Log log;
-	private final long maxFileBytes;
-	private final long maxTotalBytes;
+	private volatile long maxFileBytes;
+	private volatile long maxTotalBytes;
 
 	private volatile long version;
 	private volatile Map<String, Script> scripts = Map.of();
 	private volatile ServerGroups groups = new ServerGroups(Map.of());
 
-	/** One file: where it lives, which group folder it came from, and its bytes. */
 	private record Script(String path, String group, String sha256, byte[] content) {
 	}
 
-	/**
-	 * @param dataFolder the plugin folder; scripts live in {@code scripts/} beneath
-	 *                   it and the version is recorded beside that
-	 */
 	public ScriptLibrary(File dataFolder, Log log, long maxFileBytes, long maxTotalBytes) {
 		this.root = new File(dataFolder, "scripts");
 		this.versionFile = new File(dataFolder, "scripts.version");
@@ -83,22 +78,25 @@ public final class ScriptLibrary {
 		this.groups = groups;
 	}
 
+	public synchronized void regroup(ServerGroups groups) {
+		this.groups = groups;
+		bump();
+	}
+
+	public synchronized void limits(long maxFileBytes, long maxTotalBytes) {
+		this.maxFileBytes = maxFileBytes;
+		this.maxTotalBytes = maxTotalBytes;
+	}
+
 	public ServerGroups groups() {
 		return groups;
 	}
 
-	/** @return the bytes to send for a FETCH, or null if it went away since the manifest */
 	public byte[] content(String path) {
 		Script script = scripts.get(path);
 		return script == null ? null : script.content();
 	}
 
-	/**
-	 * Rereads the folder. Only bumps the version when something actually differs,
-	 * so a push with no edits costs each backend one small frame.
-	 *
-	 * @return true if anything changed
-	 */
 	public synchronized boolean rescan() {
 		Map<String, Script> found = new LinkedHashMap<>();
 		if (!root.isDirectory()) {
@@ -178,7 +176,6 @@ public final class ScriptLibrary {
 		return true;
 	}
 
-	/** What this one server should be holding. */
 	public Manifest manifestFor(String serverName) {
 		List<ScriptEntry> entries = new ArrayList<>();
 		for (Script script : scripts.values())
@@ -187,7 +184,6 @@ public final class ScriptLibrary {
 		return new Manifest(version, entries);
 	}
 
-	/** Creates the folder and a note, so the feature is discoverable. */
 	public void ensureFolder() {
 		File global = new File(root, ServerGroups.GLOBAL);
 		if (global.isDirectory())

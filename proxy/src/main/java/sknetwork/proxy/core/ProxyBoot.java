@@ -6,10 +6,6 @@ import java.io.IOException;
 import sknetwork.common.Log;
 
 public final class ProxyBoot {
-	/**
-	 * @return the started server
-	 * @throws IOException if the socket cannot be bound, in which case nothing is running
-	 */
 	public static NetworkServer start(ProxySettings settings, File dataFolder, Log log)
 			throws IOException {
 		if (settings.tokenIsExposedDefault())
@@ -22,11 +18,19 @@ public final class ProxyBoot {
 		if (!noPersist.isEmpty())
 			log.info(noPersist.size() + " 'no-persist' pattern(s) set: matching variables are shared "
 					+ "with every backend but never written to " + settings.logName()
-					+ ", so a proxy restart starts them empty.");
+					+ ", so a proxy restart starts them empty. Each backend is sent a full snapshot "
+					+ "on its first sync after a restart, so none of them keeps one either.");
 
 		NetworkServer server = new NetworkServer(settings.bind(), settings.port(), settings.token(),
 				logFile, settings.flushIntervalMs(), settings.compactRatio(), noPersist,
 				settings.replayBuffer(), log);
+		// before start(), so the listening line and everything after it honour 'debug'
+		server.debugEnabled(settings.debug());
+		server.settings(settings);
+
+		PingState ping = new PingState(dataFolder, log);
+		ping.load();
+		server.ping(ping);
 		server.start();
 		server.features(settings.players(), settings.remoteCommands());
 		server.usePlayerUuids(settings.usePlayerUuids());
@@ -42,8 +46,6 @@ public final class ProxyBoot {
 			File dataFolder, Log log) {
 		ScriptLibrary library = new ScriptLibrary(dataFolder, log,
 				settings.maxFileBytes(), settings.maxTotalBytes());
-		// made whether or not the feature is on: an empty scripts/ with a README beside
-		// config.yml is how anybody finds out this exists at all
 		library.ensureFolder();
 
 		if (!settings.scriptsEnabled()) {

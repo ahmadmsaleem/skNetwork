@@ -24,7 +24,7 @@ import sknetwork.spigot.SkNetworkSpigot;
 		""")
 @Example("""
 		if network server "survival" is online:
-			connect network player "%player%" to "survival"
+			connect network player player to "survival"
 		else:
 			send "&cSurvival is down."
 		""")

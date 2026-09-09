@@ -9,6 +9,8 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -35,34 +37,34 @@ final class CsvChangeLog implements ChangeLog {
 	private static final String HEADER_PREFIX = "# skNetwork v";
 	private static final String HEADER = "# skNetwork v2 seq=";
 
-	/**
-	 * Sits above {@link #HEADER} whenever the file is created or compacted, in the
-	 * same spirit as the note Skript puts at the top of variables.csv. Every line of
-	 * it starts with '#', which the replay skips like any other comment.
-	 */
 	private static final String WARNING = """
 			# === skNetwork's network variable storage ===
-			# Please do not modify this file manually!
-			#
-			# The proxy owns this file while it is running. It appends to it as scripts
-			# write, and rewrites it whole when it compacts, so an edit made under a
-			# running proxy is overwritten without ever being read. Stop the proxy first.
-			#
-			# The seq= number on the next line is where sequence numbers resume after a
-			# restart. Lower it and the proxy reissues numbers this log has already used.
+			# 
+			# 
+			# Every network variable the proxy holds, one line per write, newest last.
+			# Compacting rewrites it to one line per key.
+			# Never modify this file by hand.
 			""";
 	private static final int MIN_LINES_BEFORE_COMPACT = 1_000;
+
+	private static final String BACKUP_FOLDER = "backup";
+
+	private static final DateTimeFormatter STAMP =
+			DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
 	private final File file;
 	private final File backup;
 	private final File temp;
 	private final double compactRatio;
-	private final NamePatterns noPersist;
+	private volatile NamePatterns noPersist;
 	private final Log log;
 
 	private Writer out;
 	private long dataLines;
 	private boolean dirty;
+	private volatile long lastCompaction;
+	private volatile long lastFlush;
+	private volatile boolean mayBeMissingKeys;
 
 	CsvChangeLog(File file, double compactRatio, Log log) {
 		this(file, compactRatio, NamePatterns.none(), log);
@@ -77,11 +79,6 @@ final class CsvChangeLog implements ChangeLog {
 		this.log = log;
 	}
 
-	/**
-	 * Replays the log into the store and opens it for appending.
-	 *
-	 * @return the highest sequence number seen, which the proxy resumes from
-	 */
 	@Override
 	public synchronized long open(VariableStore store) throws IOException {
 		File source = file;
@@ -93,6 +90,7 @@ final class CsvChangeLog implements ChangeLog {
 
 		long highWater = 0;
 		dataLines = 0;
+		mayBeMissingKeys = !noPersist.isEmpty();
 
 		if (source.isFile()) {
 			List<String> lines = Files.readAllLines(source.toPath(), StandardCharsets.UTF_8);
@@ -108,7 +106,6 @@ final class CsvChangeLog implements ChangeLog {
 				if (trimmed.isEmpty() || trimmed.startsWith("#"))
 					continue;
 
-				// four fields is a v1 line, written before values carried a display string
 				String[] fields = CsvLine.split(trimmed);
 				if (fields == null || fields.length < 4 || fields.length > 5) {
 					broken++;
@@ -128,9 +125,6 @@ final class CsvChangeLog implements ChangeLog {
 				String value = fields[3];
 				String display = fields.length == 5 && !fields[4].isEmpty() ? fields[4] : null;
 
-				// a name that is no-persist now may still be on disk from before the
-				// pattern was added. it is not replayed, and the scrub below rewrites
-				// the file without it rather than leaving it there to be read again.
 				if (noPersist.matches(name)) {
 					highWater = Math.max(highWater, seq);
 					dataLines++;
@@ -152,6 +146,8 @@ final class CsvChangeLog implements ChangeLog {
 				highWater = Math.max(highWater, seq);
 				dataLines++;
 			}
+
+			mayBeMissingKeys |= broken > 0 || source == backup;
 
 			if (broken > 0)
 				log.warn("skipped " + broken + " unreadable line(s) in " + source.getName());
@@ -193,20 +189,15 @@ final class CsvChangeLog implements ChangeLog {
 				new FileOutputStream(target, true), StandardCharsets.UTF_8));
 		if (fresh) {
 			writer.write(WARNING + HEADER + "0\n");
-			// straight to disk: on a proxy that has not had a write yet this is the whole
-			// file, and an empty network.csv tells a new admin nothing
 			writer.flush();
 		}
 		return writer;
 	}
 
-	/** A null value writes a tombstone. Writer thread only. */
 	@Override
 	public synchronized void append(long seq, String name, String type, byte[] value, String display) {
 		if (out == null)
 			return;
-
-		// never reaches the disk, so there is no tombstone to write for it either
 		if (noPersist.matches(name))
 			return;
 
@@ -221,44 +212,96 @@ final class CsvChangeLog implements ChangeLog {
 	}
 
 	@Override
+	public synchronized void noPersist(NamePatterns patterns, VariableStore store, long seq) {
+		this.noPersist = patterns;
+		compact(store, seq, true);
+	}
+
+	@Override
 	public synchronized void flush() {
 		if (out == null || !dirty)
 			return;
 		try {
 			out.flush();
 			dirty = false;
+			lastFlush = System.currentTimeMillis();
 		} catch (IOException e) {
 			log.error("could not flush " + file.getName(), e);
 		}
 	}
 
 	@Override
+	public boolean mayBeMissingKeys() {
+		return mayBeMissingKeys;
+	}
+
+	@Override
+	public long lastCompaction() {
+		return lastCompaction;
+	}
+
+	@Override
+	public long lastFlush() {
+		return lastFlush;
+	}
+
+	@Override
+	public synchronized long compactThreshold(long liveKeys) {
+		return Math.max(MIN_LINES_BEFORE_COMPACT, (long) (compactRatio * Math.max(liveKeys, 1)));
+	}
+
+	@Override
+	public synchronized File backup() throws IOException {
+		flush();
+		if (!file.isFile())
+			throw new IOException(file.getName() + " does not exist yet, so there is nothing to copy");
+
+		File parent = file.getParentFile();
+		File folder = parent == null ? new File(BACKUP_FOLDER) : new File(parent, BACKUP_FOLDER);
+		if (!folder.isDirectory() && !folder.mkdirs())
+			throw new IOException("could not create " + folder);
+
+		File target = new File(folder, stamped());
+		Files.copy(file.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+		log.info("backed up " + file.getName() + " to " + BACKUP_FOLDER + "/" + target.getName());
+		return target;
+	}
+
+	private String stamped() {
+		String name = file.getName();
+		int dot = name.lastIndexOf('.');
+		String base = dot < 0 ? name : name.substring(0, dot);
+		String extension = dot < 0 ? "" : name.substring(dot);
+		return base + "-" + STAMP.format(LocalDateTime.now()) + extension;
+	}
+
+	@Override
+	public synchronized void compact(VariableStore store, long seq) {
+		compact(store, seq, false);
+	}
+
+	@Override
+	public synchronized long bytes() {
+		return file.length();
+	}
+
+	@Override
+	public synchronized long dataLines() {
+		return dataLines;
+	}
+
+	@Override
 	public synchronized void maybeCompact(VariableStore store, long seq) {
-		if (dataLines > MIN_LINES_BEFORE_COMPACT
-				&& dataLines > compactRatio * Math.max(store.size(), 1))
+		if (dataLines > compactThreshold(store.size()))
 			compact(store, seq, false);
 	}
 
-	/**
-	 * A compaction that also overwrites the backup, because the values being
-	 * dropped are the whole point and leaving them in network.csv.bak until the
-	 * next compaction would keep them readable for another whole cycle.
-	 */
 	private synchronized void scrub(VariableStore store, long seq) {
 		compact(store, seq, true);
 	}
 
-	/**
-	 * Rewrites the log as one line per live key. Temp file, fsync, atomic rename,
-	 * keeping one backup, so a crash leaves either the old file or the new one.
-	 *
-	 * @param scrubBackup replace the backup with the rewritten file rather than
-	 *                    letting it keep the pre-compaction content
-	 */
 	private synchronized void compact(VariableStore store, long seq, boolean scrubBackup) {
 		List<Map.Entry<String, VariableEntry>> live = new ArrayList<>(store.entries());
-		// the store keeps no-persist variables in memory and serves them to backends
-		// like any other. this is the second place they must not reach the disk.
 		live.removeIf(entry -> noPersist.matches(entry.getKey()));
 
 		try {
@@ -286,8 +329,6 @@ final class CsvChangeLog implements ChangeLog {
 			Files.move(temp.toPath(), file.toPath(),
 					StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 
-			// the pre-scrub file is still sitting in the backup holding exactly what
-			// was meant to go away, so it is replaced rather than kept
 			if (scrubBackup && file.isFile())
 				Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
@@ -296,6 +337,7 @@ final class CsvChangeLog implements ChangeLog {
 					new FileOutputStream(file, true), StandardCharsets.UTF_8));
 			dataLines = live.size();
 			dirty = false;
+			lastCompaction = System.currentTimeMillis();
 
 			log.info("compacted " + file.getName() + ": " + before + " lines -> " + dataLines);
 		} catch (IOException e) {

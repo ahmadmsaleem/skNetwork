@@ -82,7 +82,6 @@ class NetworkServerTest {
 		awaitWarning("use player UUIDs in variable names");
 	}
 
-	/** Naming the odd one out is the whole point, so the message has to carry it. */
 	@Test
 	void namesTheBackendThatDisagrees() throws IOException {
 		server.usePlayerUuids(true);
@@ -92,7 +91,6 @@ class NetworkServerTest {
 		awaitWarning("survival has 'use player UUIDs in variable names' set to false");
 	}
 
-	/** A mismatch is worth saying out loud, but it is not worth refusing the backend. */
 	@Test
 	void stillAcceptsABackendKeyingPlayersTheOtherWay() throws IOException {
 		server.usePlayerUuids(true);
@@ -461,6 +459,81 @@ class NetworkServerTest {
 	}
 
 	@Test
+	void listsEveryConnectedBackendByName() throws IOException {
+		synced("survival");
+		synced("lobby");
+
+		assertEquals(List.of("lobby", "survival"),
+				server.backends().stream().map(NetworkServer.Backend::name).toList());
+	}
+
+	@Test
+	void carriesTheSkriptVersionFromTheHandshake() throws IOException {
+		synced("lobby");
+
+		assertEquals("2.16.2", only().skriptVersion());
+	}
+
+	@Test
+	void carriesTheAddressItConnectedFrom() throws IOException {
+		synced("lobby");
+
+		assertTrue(only().address().contains("127.0.0.1"));
+	}
+
+	@Test
+	void keepsFlaggingABackendKeyingPlayersTheOtherWay() throws IOException {
+		server.usePlayerUuids(true);
+
+		connectWithPlayerUuids("survival", false).sync();
+
+		await(() -> server.backends().size() == 1, "survival never registered");
+		assertFalse(only().usePlayerUuids());
+	}
+
+	@Test
+	void leavesABackendThatAgreesUnflagged() throws IOException {
+		server.usePlayerUuids(true);
+
+		connectWithPlayerUuids("lobby", true).sync();
+
+		await(() -> server.backends().size() == 1, "lobby never registered");
+		assertTrue(only().usePlayerUuids());
+	}
+
+	@Test
+	void keepsABackendThatIsReadingLevelWithTheProxy() throws IOException {
+		FakeBackend lobby = synced("lobby");
+
+		lobby.set("coins", "long", Numbers.writeLong(10));
+		lobby.set("gems", "long", Numbers.writeLong(20));
+
+		await(() -> only().behind() == 0, "lobby never caught up");
+		assertEquals(server.sequence(), only().lastSeq());
+		assertEquals(0, only().queuedBytes());
+	}
+
+	@Test
+	void countsABackendAsBehindByWhatHasNotReachedItsSocket() throws IOException {
+		FakeBackend lobby = synced("lobby");
+		FakeBackend frozen = synced("frozen");
+
+		byte[] blob = new byte[256 * 1024];
+		for (int i = 0; i < 60; i++)
+			lobby.set("blob" + i, "string", blob);
+
+		await(() -> backend("frozen") != null && backend("frozen").behind() > 0,
+				"the frozen backend never fell behind");
+		assertTrue(backend("frozen").queuedBytes() > 0);
+		frozen.close();
+	}
+
+	@Test
+	void reportsNoBackendsBeforeAnyConnect() {
+		assertTrue(server.backends().isEmpty());
+	}
+
+	@Test
 	void replaysWhatABackendMissedRatherThanResending() throws IOException {
 		FakeBackend lobby = synced("lobby");
 		lobby.set("a", "long", Numbers.writeLong(1));
@@ -532,6 +605,21 @@ class NetworkServerTest {
 		assertEquals(40, connected("survival").sync().snapshot().size());
 	}
 
+	/**
+	 * Two values that straddle the chunk boundary. The chunk is measured before the
+	 * next value is appended, so one that lands on a nearly full chunk carries it
+	 * past the frame cap, and the backend cannot read the snapshot it is sent.
+	 */
+	@Test
+	void keepsASnapshotFrameUnderTheCapWhenOneValueStraddlesTheBoundary() throws IOException {
+		FakeBackend lobby = synced("lobby");
+		lobby.fireAndForget(MutationMode.SET, "blob::a", "string", new byte[4_500_000]);
+		lobby.fireAndForget(MutationMode.SET, "blob::b", "string", new byte[3_900_000]);
+		lobby.deltaAt(2);
+
+		assertEquals(2, connected("survival").sync().snapshot().size());
+	}
+
 	@Test
 	void spreadsALargeSnapshotOverSeveralFrames() throws IOException {
 		FakeBackend lobby = synced("lobby");
@@ -560,6 +648,113 @@ class NetworkServerTest {
 		assertEquals(2, server.variableCount());
 		assertEquals(2, server.sequence());
 		assertEquals(2, connected("survival").sync().snapshot().size());
+	}
+
+	@Test
+	void doesNotResumeABackendAcrossARestartThatDroppedNoPersistKeys() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		FakeBackend lobby = synced("lobby");
+		lobby.set("coins", "long", Numbers.writeLong(100));
+		lobby.set("session::a", "string", new byte[] {1});
+		lobby.set("coins", "long", Numbers.writeLong(200));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		assertEquals(1, server.variableCount());
+		assertEquals(3, server.sequence());
+
+		FakeBackend.Sync sync = connect("lobby", TOKEN, Protocol.VERSION, 3).sync();
+
+		assertFalse(sync.resumed(), "a caught up backend still holds the dropped session key");
+		assertTrue(sync.fullSnapshot());
+		assertEquals(List.of("coins"), sync.snapshot());
+	}
+
+	@Test
+	void leavesTwoBackendsAgreeingAfterARestartThatDroppedKeys() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		FakeBackend lobby = synced("lobby");
+		lobby.set("coins", "long", Numbers.writeLong(100));
+		lobby.set("session::a", "string", new byte[] {1});
+		lobby.set("coins", "long", Numbers.writeLong(200));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		List<String> caughtUp = connect("lobby", TOKEN, Protocol.VERSION, 3).sync().snapshot();
+		List<String> fresh = connect("survival", TOKEN, Protocol.VERSION, 0).sync().snapshot();
+
+		assertEquals(fresh, caughtUp);
+	}
+
+	@Test
+	void doesNotResumeABackendAcrossARestartThatSkippedAnUnreadableLine() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		Files.writeString(logFile.toPath(), """
+				# skNetwork v2 seq=0
+				1, coins, long, 0000000000000064, 100
+				2, lost, long, ZZZZ, x
+				3, other, long, 0000000000000001, 1
+				""", StandardCharsets.UTF_8);
+
+		server.stop();
+		server = start(logFile, 10_000);
+
+		assertEquals(2, server.variableCount());
+		assertEquals(3, server.sequence());
+
+		FakeBackend.Sync sync = connect("lobby", TOKEN, Protocol.VERSION, 3).sync();
+
+		assertFalse(sync.resumed(), "the skipped line is a key the backend may still hold");
+		assertTrue(sync.fullSnapshot());
+		awaitWarning("unreadable line");
+	}
+
+	@Test
+	void stillResumesAcrossARestartWhenNothingCouldHaveBeenDropped() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000);
+
+		synced("lobby").set("coins", "long", Numbers.writeLong(100));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000);
+		FakeBackend.Sync sync = connect("lobby", TOKEN, Protocol.VERSION, 1).sync();
+
+		assertTrue(sync.resumed(), "a clean log has nothing to put right, so resuming is still free");
+		assertFalse(sync.fullSnapshot());
+	}
+
+	@Test
+	void resumesOnceThatBackendHasHadItsSnapshot() throws IOException {
+		File logFile = new File(folder, "network.csv");
+		server.stop();
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		synced("lobby").set("coins", "long", Numbers.writeLong(100));
+		backends.forEach(FakeBackend::close);
+		backends.clear();
+		server.stop();
+
+		server = start(logFile, 10_000, NamePatterns.of(List.of("session::*")));
+
+		assertFalse(connect("lobby", TOKEN, Protocol.VERSION, 1).sync().resumed());
+		assertTrue(connect("lobby", TOKEN, Protocol.VERSION, 1).sync().resumed(),
+				"the second connection in this run has already been put right");
 	}
 
 	@Test
@@ -723,6 +918,26 @@ class NetworkServerTest {
 		});
 	}
 
+	private NetworkServer start(File logFile, int replayCapacity, NamePatterns noPersist)
+			throws IOException {
+		BindException lost = null;
+
+		for (int attempt = 0; attempt < 20; attempt++) {
+			int candidate = freePort();
+			NetworkServer started = new NetworkServer("127.0.0.1", candidate, TOKEN, logFile, 10, 2.0,
+					noPersist, replayCapacity, log);
+			try {
+				started.start();
+				port = candidate;
+				return started;
+			} catch (BindException taken) {
+				lost = taken;
+				started.stop();
+			}
+		}
+		throw lost;
+	}
+
 	private NetworkServer start(File logFile, int replayCapacity) throws IOException {
 		BindException lost = null;
 
@@ -775,6 +990,19 @@ class NetworkServerTest {
 		ScriptLibrary library = new ScriptLibrary(dataFolder, log, 512 * 1024L, 16 * 1024 * 1024L);
 		library.rescan();
 		return library;
+	}
+
+	private NetworkServer.Backend only() {
+		List<NetworkServer.Backend> backends = server.backends();
+		assertEquals(1, backends.size(), "expected exactly one backend");
+		return backends.get(0);
+	}
+
+	private NetworkServer.Backend backend(String name) {
+		return server.backends().stream()
+				.filter(backend -> backend.name().equals(name))
+				.findFirst()
+				.orElse(null);
 	}
 
 	private void awaitLog(String fragment) {

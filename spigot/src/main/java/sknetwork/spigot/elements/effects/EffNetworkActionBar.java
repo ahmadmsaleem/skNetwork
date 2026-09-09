@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.List;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -20,6 +19,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.common.PlayerAction;
 import sknetwork.spigot.NetworkText;
 import sknetwork.spigot.SkNetworkSpigot;
+import sknetwork.spigot.elements.types.NetworkPlayer;
 
 @Name("Network Action Bar")
 @Description("""
@@ -37,13 +37,13 @@ public class EffNetworkActionBar extends Effect {
 		registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffNetworkActionBar.class)
 				.supplier(EffNetworkActionBar::new)
 				.addPatterns(
-						"send network action[ ]bar %objects% to network player[s] %strings%",
-						"send network action[ ]bar %objects% to [the] [whole] network")
+						"send network action[ ]bar %objects% to network player[s] %networkplayers%",
+						"send network action[ ]bar %objects% (across|to) [the] [whole] network")
 				.build());
 	}
 
 	private Expression<? extends Component> text;
-	private Expression<String> targets;
+	private Expression<NetworkPlayer> targets;
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -53,7 +53,7 @@ public class EffNetworkActionBar extends Effect {
 		if (text == null)
 			return false;
 		if (matchedPattern == 0)
-			targets = (Expression<String>) exprs[1];
+			targets = (Expression<NetworkPlayer>) exprs[1];
 		return true;
 	}
 
@@ -63,10 +63,12 @@ public class EffNetworkActionBar extends Effect {
 		if (plugin == null)
 			return;
 
-		List<String> to = targets == null ? List.of() : List.of(targets.getArray(event));
+		NetworkTargets.Targets to = NetworkTargets.of(targets, event);
 		for (Component line : text.getArray(event))
-			plugin.playerAction(PlayerAction.ACTION_BAR, to, NetworkText.toJson(line));
+			plugin.playerAction(PlayerAction.ACTION_BAR, to.everyone(), to.names(),
+					NetworkTargets.text(NetworkText.toJson(line)));
 	}
+
 
 	@Override
 	public @NotNull String toString(@Nullable Event event, boolean debug) {

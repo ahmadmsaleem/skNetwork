@@ -39,8 +39,6 @@ import sknetwork.spigot.elements.types.LastAtomic;
 public class CondAtomicChange extends Condition {
 
 	public static void register(@NotNull SyntaxRegistry registry) {
-		// 'failed' and 'timed out' overlap on purpose: a timeout is a failure, but only a
-		// refusal proves the change did not happen
 		registry.register(SyntaxRegistry.CONDITION, SyntaxInfo.builder(CondAtomicChange.class)
 				.supplier(CondAtomicChange::new)
 				.addPatterns(
@@ -64,9 +62,10 @@ public class CondAtomicChange extends Condition {
 	@Override
 	public boolean check(@NotNull Event event) {
 		AtomicResult result = LastAtomic.of(event);
-		boolean value = checksAnswer
-				? result != null && !result.answered()
-				: result != null && result.ok();
+		if (result == null)
+			return false;
+
+		boolean value = checksAnswer ? !result.answered() : result.ok();
 		return isNegated() != value;
 	}
 

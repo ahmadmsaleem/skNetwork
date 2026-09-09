@@ -1,5 +1,7 @@
 package sknetwork.proxy.core;
 
+import java.io.File;
+
 final class NoopChangeLog implements ChangeLog {
 
 
@@ -9,7 +11,16 @@ final class NoopChangeLog implements ChangeLog {
 	}
 
 	@Override
+	public boolean mayBeMissingKeys() {
+		return false;
+	}
+
+	@Override
 	public void append(long seq, String name, String type, byte[] value, String display) {
+	}
+
+	@Override
+	public void noPersist(NamePatterns patterns, VariableStore store, long seq) {
 	}
 
 	@Override
@@ -18,6 +29,40 @@ final class NoopChangeLog implements ChangeLog {
 
 	@Override
 	public void maybeCompact(VariableStore store, long seq) {
+	}
+
+	@Override
+	public void compact(VariableStore store, long seq) {
+	}
+
+	@Override
+	public long bytes() {
+		return 0;
+	}
+
+	@Override
+	public long dataLines() {
+		return 0;
+	}
+
+	@Override
+	public long lastCompaction() {
+		return 0;
+	}
+
+	@Override
+	public long lastFlush() {
+		return 0;
+	}
+
+	@Override
+	public long compactThreshold(long liveKeys) {
+		return 0;
+	}
+
+	@Override
+	public File backup() {
+		return null;
 	}
 
 	@Override

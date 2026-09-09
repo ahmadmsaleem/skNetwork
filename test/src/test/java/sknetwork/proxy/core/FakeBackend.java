@@ -201,21 +201,32 @@ final class FakeBackend implements AutoCloseable {
 	}
 
 	void playerAction(PlayerAction action, List<String> targets, String payload) throws IOException {
+		playerAction(action, false, targets, payload);
+	}
+
+	void everyone(PlayerAction action, String payload) throws IOException {
+		playerAction(action, true, List.of(), payload);
+	}
+
+	void playerAction(PlayerAction action, boolean everyone, List<String> targets, String payload)
+			throws IOException {
 		PacketOut out = new PacketOut(Protocol.PLAYER_ACTION)
 				.varInt(action.id())
+				.bool(everyone)
 				.varInt(targets.size());
 		targets.forEach(out::string);
-		out.string(payload).frame().write(this.out);
+		out.nullableBytes(PacketOut.body().string(payload).payload()).frame().write(this.out);
 	}
 
 	Delivery delivery() throws IOException {
 		PacketIn packet = await(Protocol.PLAYER_DELIVERY).reader();
 		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
+		boolean everyone = packet.bool();
 		int count = packet.varInt();
 		List<String> targets = new ArrayList<>(count);
 		for (int i = 0; i < count; i++)
 			targets.add(packet.string());
-		return new Delivery(action, targets, packet.string());
+		return new Delivery(action, everyone, targets, new PacketIn(packet.nullableBytes()).string());
 	}
 
 	void consoleCommand(List<String> servers, String command) throws IOException {
@@ -312,6 +323,18 @@ final class FakeBackend implements AutoCloseable {
 		}
 	}
 
+	boolean sawDeliveryBeforePong(long nonce) throws IOException {
+		new PacketOut(Protocol.PING).int64(nonce).frame().write(out);
+		while (true) {
+			Frame frame = take();
+			assertNotNull(frame, name + " waited " + TIMEOUT_MS + "ms for a pong and got nothing");
+			if (frame.opcode == Protocol.PLAYER_DELIVERY)
+				return true;
+			if (frame.opcode == Protocol.PONG)
+				return false;
+		}
+	}
+
 	Frame await(byte opcode) throws IOException {
 		while (true) {
 			Frame frame = take();
@@ -346,7 +369,7 @@ final class FakeBackend implements AutoCloseable {
 			String wasType, byte[] wasValue) {
 	}
 
-	record Delivery(PlayerAction action, List<String> targets, String payload) {
+	record Delivery(PlayerAction action, boolean everyone, List<String> targets, String payload) {
 	}
 
 	record Sync(boolean resumed, boolean fullSnapshot, long seq, List<String> snapshot,

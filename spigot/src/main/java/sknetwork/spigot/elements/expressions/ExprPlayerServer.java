@@ -17,6 +17,8 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.registration.DefaultSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.SkNetworkSpigot;
+import sknetwork.spigot.elements.types.NetworkPlayer;
+import sknetwork.spigot.elements.types.NetworkPlayers;
 
 @Name("Network Server Of Player")
 @Description("""
@@ -42,18 +44,18 @@ public class ExprPlayerServer extends SimpleExpression<String> {
 				DefaultSyntaxInfos.Expression.builder(ExprPlayerServer.class, String.class)
 						.supplier(ExprPlayerServer::new)
 						.addPatterns(
-								"network server of [player[s]] %strings%",
-								"%strings%'[s] network server")
+								"network server of [network] [player[s]] %networkplayers%",
+								"%networkplayers%'[s] network server")
 						.build());
 	}
 
-	private Expression<String> players;
+	private Expression<NetworkPlayer> players;
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean init(Expression<?>[] exprs, int matchedPattern, @NotNull Kleenean isDelayed,
 			@NotNull ParseResult result) {
-		players = (Expression<String>) exprs[0];
+		players = (Expression<NetworkPlayer>) exprs[0];
 		return true;
 	}
 
@@ -64,8 +66,11 @@ public class ExprPlayerServer extends SimpleExpression<String> {
 			return new String[0];
 
 		List<String> found = new ArrayList<>();
-		for (String player : players.getArray(event)) {
-			String server = plugin.network().serverOf(player);
+		for (NetworkPlayer player : players.getArray(event)) {
+			String name = NetworkPlayers.name(player);
+			if (name == null)
+				continue;
+			String server = plugin.network().serverOf(name);
 			if (server != null)
 				found.add(server);
 		}

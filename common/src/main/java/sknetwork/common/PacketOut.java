@@ -17,6 +17,15 @@ public final class PacketOut {
 		this.opcode = opcode;
 	}
 
+	/** A payload with no frame around it, for the body of another packet. */
+	public static PacketOut body() {
+		return new PacketOut((byte) 0);
+	}
+
+	public byte[] payload() {
+		return bytes.toByteArray();
+	}
+
 	public PacketOut varInt(int value) {
 		try {
 			VarInt.write(out, value);
@@ -29,6 +38,15 @@ public final class PacketOut {
 	public PacketOut int64(long value) {
 		try {
 			out.writeLong(value);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		return this;
+	}
+
+	public PacketOut float32(float value) {
+		try {
+			out.writeFloat(value);
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}

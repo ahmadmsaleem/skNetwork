@@ -17,22 +17,28 @@ import sknetwork.common.Manifest;
 import sknetwork.common.MutationMode;
 import sknetwork.common.PacketIn;
 import sknetwork.common.PacketOut;
+import sknetwork.common.PingField;
 import sknetwork.common.PlayerAction;
+import sknetwork.common.PlayerProperties;
 import sknetwork.common.Protocol;
 import sknetwork.common.RemoteServer;
 
 final class BackendConnection {
 
-	private static final Frame POISON = new Frame((byte) 0, new byte[0]);
+	private static final Outgoing POISON = new Outgoing(-1, null);
+
+	private record Outgoing(long seq, Frame frame) {
+	}
 
 	private final NetworkServer server;
 	private final Socket socket;
-	private final BlockingQueue<Frame> outbound = new LinkedBlockingQueue<>();
+	private final BlockingQueue<Outgoing> outbound = new LinkedBlockingQueue<>();
 	private final AtomicLong queuedBytes = new AtomicLong();
 	private final AtomicBoolean closed = new AtomicBoolean();
 
 	private final String address;
 	private volatile String name;
+	private volatile String skriptVersion = "unknown";
 	private volatile boolean usePlayerUuids;
 	private volatile boolean ready;
 	private volatile long lastSeq;
@@ -51,12 +57,24 @@ final class BackendConnection {
 		return usePlayerUuids;
 	}
 
+	String skriptVersion() {
+		return skriptVersion;
+	}
+
 	String name() {
 		return name;
 	}
 
 	String address() {
 		return address;
+	}
+
+	long lastSeq() {
+		return lastSeq;
+	}
+
+	long queuedBytes() {
+		return queuedBytes.get();
 	}
 
 	boolean isReady() {
@@ -74,9 +92,13 @@ final class BackendConnection {
 	}
 
 	void send(Frame frame) {
+		send(-1, frame);
+	}
+
+	void send(long seq, Frame frame) {
 		if (closed.get())
 			return;
-		outbound.add(frame);
+		outbound.add(new Outgoing(seq, frame));
 
 		long waiting = queuedBytes.addAndGet(frame.payload.length);
 		if (waiting > server.backlogLimit() && !closed.get()) {
@@ -132,6 +154,7 @@ final class BackendConnection {
 		boolean playerUuids = packet.bool();
 
 		this.name = serverName;
+		this.skriptVersion = skriptVersion;
 
 		if (protocol != Protocol.VERSION) {
 			reject("protocol mismatch: this proxy speaks " + Protocol.VERSION + ", "
@@ -192,6 +215,9 @@ final class BackendConnection {
 			case Protocol.SERVER_INFO -> server.serverInfo(this, RemoteServer.read(packet));
 			case Protocol.PLAYER_ACTION -> playerAction(packet);
 			case Protocol.CONSOLE_COMMAND -> consoleCommand(packet);
+			case Protocol.PLAYER_PROPERTIES -> server.playerProperties(this, properties(packet));
+			case Protocol.PING_SET -> server.pingSet(this,
+					PingField.byId((byte) packet.varInt()), packet.nullableString());
 			default -> server.log().warn("ignoring unexpected opcode 0x"
 					+ Integer.toHexString(frame.opcode & 0xFF) + " from " + name);
 		}
@@ -212,11 +238,23 @@ final class BackendConnection {
 
 	private void playerAction(PacketIn packet) throws IOException {
 		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
-		server.playerAction(this, action, names(packet), packet.string());
+		boolean everyone = packet.bool();
+		server.playerAction(this, action, everyone, names(packet), packet.nullableBytes());
 	}
 
 	private void consoleCommand(PacketIn packet) throws IOException {
 		server.consoleCommand(this, names(packet), packet.string());
+	}
+
+	private static List<PlayerProperties> properties(PacketIn packet) throws IOException {
+		int count = packet.varInt();
+		if (count < 0 || count > 100_000)
+			throw new IOException("player detail count " + count + " is out of range");
+
+		List<PlayerProperties> rows = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+			rows.add(PlayerProperties.read(packet));
+		return rows;
 	}
 
 	private static List<String> names(PacketIn packet) throws IOException {
@@ -251,11 +289,13 @@ final class BackendConnection {
 	private void writerLoop() {
 		try {
 			while (!closed.get()) {
-				Frame frame = outbound.take();
-				if (frame == POISON)
+				Outgoing outgoing = outbound.take();
+				if (outgoing == POISON)
 					return;
-				frame.write(out);
-				queuedBytes.addAndGet(-frame.payload.length);
+				outgoing.frame().write(out);
+				queuedBytes.addAndGet(-outgoing.frame().payload.length);
+				if (outgoing.seq() >= 0)
+					lastSeq = outgoing.seq();
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();

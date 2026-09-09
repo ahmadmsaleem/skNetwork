@@ -17,10 +17,11 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.registration.DefaultSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.SkNetworkSpigot;
+import sknetwork.spigot.elements.types.NetworkPlayer;
 
 @Name("Network Players")
 @Description("""
-		The names of everyone online across the whole network, or on the servers you name.
+		Everyone online across the whole network, or on the servers you name, as network players.
 		This replaces keeping your own list in a variable. The proxy rebuilds it whenever a server joins or leaves, so a server that crashes takes its players with it instead of leaving them listed forever.
 		
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
@@ -32,11 +33,11 @@ import sknetwork.spigot.SkNetworkSpigot;
 		send "On the hubs: %network players on "lobby" and "lobby2"%"
 		""")
 @Since("0.2.0")
-public class ExprNetworkPlayers extends SimpleExpression<String> {
+public class ExprNetworkPlayers extends SimpleExpression<NetworkPlayer> {
 
 	public static void register(@NotNull SyntaxRegistry registry) {
 		registry.register(SyntaxRegistry.EXPRESSION,
-				DefaultSyntaxInfos.Expression.builder(ExprNetworkPlayers.class, String.class)
+				DefaultSyntaxInfos.Expression.builder(ExprNetworkPlayers.class, NetworkPlayer.class)
 						.supplier(ExprNetworkPlayers::new)
 						.addPatterns(
 								"[(all [[of] the]|the)] network players (on|of) [server[s]] %strings%",
@@ -56,18 +57,18 @@ public class ExprNetworkPlayers extends SimpleExpression<String> {
 	}
 
 	@Override
-	protected String @NotNull [] get(@NotNull Event event) {
+	protected NetworkPlayer @NotNull [] get(@NotNull Event event) {
 		SkNetworkSpigot plugin = SkNetworkSpigot.get();
 		if (plugin == null)
-			return new String[0];
+			return new NetworkPlayer[0];
 
 		if (servers == null)
-			return plugin.network().players(null).toArray(new String[0]);
+			return plugin.network().networkPlayers(null).toArray(new NetworkPlayer[0]);
 
-		List<String> names = new ArrayList<>();
+		List<NetworkPlayer> found = new ArrayList<>();
 		for (String server : servers.getArray(event))
-			names.addAll(plugin.network().players(server));
-		return names.toArray(new String[0]);
+			found.addAll(plugin.network().networkPlayers(server));
+		return found.toArray(new NetworkPlayer[0]);
 	}
 
 	@Override
@@ -76,8 +77,8 @@ public class ExprNetworkPlayers extends SimpleExpression<String> {
 	}
 
 	@Override
-	public @NotNull Class<? extends String> getReturnType() {
-		return String.class;
+	public @NotNull Class<? extends NetworkPlayer> getReturnType() {
+		return NetworkPlayer.class;
 	}
 
 	@Override

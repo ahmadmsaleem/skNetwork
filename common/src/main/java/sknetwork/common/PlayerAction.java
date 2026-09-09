@@ -8,7 +8,10 @@ public enum PlayerAction {
 
 	MESSAGE,
 	ACTION_BAR,
-	CONNECT;
+	CONNECT,
+	TITLE,
+	SOUND,
+	TAB_LIST;
 
 
 	private static final PlayerAction[] VALUES = values();

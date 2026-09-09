@@ -21,7 +21,6 @@ final class CsvLine {
 
 	private static final Pattern NEEDS_QUOTING = Pattern.compile(".*[,\"#\\s\\\\].*", Pattern.DOTALL);
 
-	/** A null value writes a tombstone. */
 	static String format(long seq, String name, String type, byte[] value, String display) {
 		if (value == null)
 			return seq + ", " + quote(name) + ", , , ";
