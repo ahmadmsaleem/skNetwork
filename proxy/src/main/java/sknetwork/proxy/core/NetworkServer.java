@@ -63,6 +63,8 @@ public final class NetworkServer {
 	private final int replayCapacity;
 
 	private final Set<BackendConnection> connections = ConcurrentHashMap.newKeySet();
+	private final Set<String> putRightThisRun = ConcurrentHashMap.newKeySet();
+	private volatile boolean rebuildMayBeShort;
 	private final AtomicLong sequence = new AtomicLong();
 
 	private volatile boolean running;
@@ -268,6 +270,7 @@ public final class NetworkServer {
 
 	public void start() throws IOException {
 		sequence.set(changeLog.open(store));
+		rebuildMayBeShort = changeLog.mayBeMissingKeys();
 
 		ServerSocket socket = new ServerSocket();
 		socket.setReuseAddress(true);
@@ -887,7 +890,8 @@ public final class NetworkServer {
 		boolean plausible = lastSeq > 0 && lastSeq <= current;
 		boolean covered = lastSeq == current
 				|| (!replay.isEmpty() && lastSeq + 1 >= replay.peekFirst().seq());
-		boolean canResume = plausible && covered;
+		boolean putRight = !rebuildMayBeShort || putRightThisRun.contains(target.name());
+		boolean canResume = plausible && covered && putRight;
 
 		target.sendWelcome(current, canResume);
 
@@ -938,12 +942,17 @@ public final class NetworkServer {
 
 		target.send(current, new PacketOut(Protocol.SYNCED).int64(current).bool(true).frame());
 
+		putRightThisRun.add(target.name());
 		target.markReady();
 		sendStateTo(target);
 		target.send(pingFrame());
 		sendPropertiesTo(target);
 		pushTo(target);
-		if (lastSeq > 0)
+		if (!putRight && plausible && covered)
+			log.info(target.name() + " asked to resume from seq " + lastSeq + ", but this proxy "
+					+ "rebuilt its variables from disk and cannot prove a caught up backend holds "
+					+ "the same set - sent a full snapshot instead");
+		else if (lastSeq > 0)
 			log.info(target.name() + " asked to resume from seq " + lastSeq
 					+ " but that is past the replay buffer - sent a full snapshot instead");
 		log.info(target.name() + " synced: " + pending.size() + " variable(s) at seq " + current);

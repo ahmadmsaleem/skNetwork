@@ -8,6 +8,8 @@ interface ChangeLog {
 
 	long open(VariableStore store) throws IOException;
 
+	boolean mayBeMissingKeys();
+
 	void append(long seq, String name, String type, byte[] value, String display);
 
 	void noPersist(NamePatterns patterns, VariableStore store, long seq);

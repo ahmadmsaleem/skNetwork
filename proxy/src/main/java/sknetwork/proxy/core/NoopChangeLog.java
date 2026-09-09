@@ -11,6 +11,11 @@ final class NoopChangeLog implements ChangeLog {
 	}
 
 	@Override
+	public boolean mayBeMissingKeys() {
+		return false;
+	}
+
+	@Override
 	public void append(long seq, String name, String type, byte[] value, String display) {
 	}
 

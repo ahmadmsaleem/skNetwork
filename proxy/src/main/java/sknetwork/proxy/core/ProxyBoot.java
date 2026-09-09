@@ -18,7 +18,8 @@ public final class ProxyBoot {
 		if (!noPersist.isEmpty())
 			log.info(noPersist.size() + " 'no-persist' pattern(s) set: matching variables are shared "
 					+ "with every backend but never written to " + settings.logName()
-					+ ", so a proxy restart starts them empty.");
+					+ ", so a proxy restart starts them empty. Each backend is sent a full snapshot "
+					+ "on its first sync after a restart, so none of them keeps one either.");
 
 		NetworkServer server = new NetworkServer(settings.bind(), settings.port(), settings.token(),
 				logFile, settings.flushIntervalMs(), settings.compactRatio(), noPersist,
