@@ -15,6 +15,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.SkNetworkSpigot;
 import sknetwork.spigot.elements.types.NetworkPlayer;
+import sknetwork.spigot.elements.types.NetworkPlayers;
 
 @Name("Network Player Is Online")
 @Description("""
@@ -56,8 +57,10 @@ public class CondNetworkPlayerOnline extends Condition {
 		if (plugin == null)
 			return isNegated();
 
-		return isNegated() != players.check(event, player -> player.name() != null
-				&& plugin.network().serverOf(player.name()) != null);
+		return isNegated() != players.check(event, player -> {
+			String name = NetworkPlayers.name(player);
+			return name != null && plugin.network().serverOf(name) != null;
+		});
 	}
 
 	@Override

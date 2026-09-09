@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.List;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -69,9 +68,10 @@ public class EffNetworkMessage extends Effect {
 		if (plugin == null)
 			return;
 
-		List<String> to = NetworkTargets.names(targets, event);
+		NetworkTargets.Targets to = NetworkTargets.of(targets, event);
 		for (Component message : messages.getArray(event))
-			plugin.playerAction(PlayerAction.MESSAGE, to, NetworkTargets.text(NetworkText.toJson(message)));
+			plugin.playerAction(PlayerAction.MESSAGE, to.everyone(), to.names(),
+					NetworkTargets.text(NetworkText.toJson(message)));
 	}
 
 

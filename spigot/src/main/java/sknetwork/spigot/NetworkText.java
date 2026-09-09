@@ -13,6 +13,13 @@ public final class NetworkText {
 	private static final LegacyComponentSerializer SECTION = LegacyComponentSerializer.builder()
 			.character('\u00a7').hexColors().build();
 
+	private static final LegacyComponentSerializer AMPERSAND = LegacyComponentSerializer.builder()
+			.character('&').hexColors().build();
+
+	public static String fromAmpersand(String value) {
+		return SECTION.serialize(AMPERSAND.deserialize(value));
+	}
+
 	/** How a component reads as a plain Skript string. */
 	public static String toLegacy(Component component) {
 		return SECTION.serialize(component);

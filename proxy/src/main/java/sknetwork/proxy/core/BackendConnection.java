@@ -238,7 +238,8 @@ final class BackendConnection {
 
 	private void playerAction(PacketIn packet) throws IOException {
 		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
-		server.playerAction(this, action, names(packet), packet.nullableBytes());
+		boolean everyone = packet.bool();
+		server.playerAction(this, action, everyone, names(packet), packet.nullableBytes());
 	}
 
 	private void consoleCommand(PacketIn packet) throws IOException {

@@ -27,15 +27,6 @@ public final class NetworkPlayer {
 	}
 
 	public static NetworkPlayer parse(String input) {
-		if (input == null || input.isBlank())
-			return null;
-
-		String trimmed = input.trim();
-		UUID parsed = readUuid(trimmed);
-		return parsed == null ? new NetworkPlayer(trimmed, null) : new NetworkPlayer(null, parsed);
-	}
-
-	public static NetworkPlayer literal(String input) {
 		if (input == null)
 			return null;
 

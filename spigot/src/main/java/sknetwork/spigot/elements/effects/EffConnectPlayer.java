@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.List;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -59,7 +58,8 @@ public class EffConnectPlayer extends Effect {
 		if (plugin == null || server == null)
 			return;
 
-		plugin.playerAction(PlayerAction.CONNECT, NetworkTargets.names(players, event), NetworkTargets.text(server));
+		plugin.playerAction(PlayerAction.CONNECT, false, NetworkTargets.of(players, event).names(),
+				NetworkTargets.text(server));
 	}
 
 

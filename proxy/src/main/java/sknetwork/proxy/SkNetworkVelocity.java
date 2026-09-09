@@ -115,6 +115,30 @@ public final class SkNetworkVelocity {
 	}
 
 	@Subscribe
+	public void onProxyPing(ProxyPingEvent event) {
+		if (server == null)
+			return;
+
+		PingSettings ping = server.pingSettings();
+		if (ping.isEmpty())
+			return;
+
+		ServerPing.Builder response = event.getPing().asBuilder();
+		if (ping.motd() != null)
+			response.description(LEGACY.deserialize(ping.motd()));
+
+		Integer max = ping.number(PingField.MAX_PLAYERS);
+		if (max != null)
+			response.maximumPlayers(max);
+
+		Integer online = ping.number(PingField.PLAYER_COUNT);
+		if (online != null)
+			response.onlinePlayers(online);
+
+		event.setPing(response.build());
+	}
+
+	@Subscribe
 	public void onProxyShutdown(ProxyShutdownEvent event) {
 		if (server != null)
 			server.stop();

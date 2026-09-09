@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.List;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -104,8 +103,8 @@ public class EffNetworkTabList extends Effect {
 		PacketOut body = PacketOut.body();
 		payload.write(body);
 
-		List<String> to = NetworkTargets.names(targets, event);
-		plugin.playerAction(PlayerAction.TAB_LIST, to, body.payload());
+		NetworkTargets.Targets to = NetworkTargets.of(targets, event);
+		plugin.playerAction(PlayerAction.TAB_LIST, to.everyone(), to.names(), body.payload());
 	}
 
 	private static String json(Expression<? extends Component> expression, Event event) {

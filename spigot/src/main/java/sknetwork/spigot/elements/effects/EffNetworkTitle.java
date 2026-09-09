@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.List;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -103,8 +102,8 @@ public class EffNetworkTitle extends Effect {
 		PacketOut body = PacketOut.body();
 		payload.write(body);
 
-		List<String> to = NetworkTargets.names(targets, event);
-		plugin.playerAction(PlayerAction.TITLE, to, body.payload());
+		NetworkTargets.Targets to = NetworkTargets.of(targets, event);
+		plugin.playerAction(PlayerAction.TITLE, to.everyone(), to.names(), body.payload());
 	}
 
 	private static int ticks(Expression<Timespan> expression, Event event, int fallback) {

@@ -39,7 +39,7 @@ public final class NetworkPlayerType {
 
 					@Override
 					public @Nullable NetworkPlayer parse(@NotNull String input, @NotNull ParseContext context) {
-						return NetworkPlayer.literal(input);
+						return NetworkPlayer.parse(input);
 					}
 
 					@Override

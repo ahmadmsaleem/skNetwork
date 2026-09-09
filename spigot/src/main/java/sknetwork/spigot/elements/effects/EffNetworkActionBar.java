@@ -1,6 +1,5 @@
 package sknetwork.spigot.elements.effects;
 
-import java.util.List;
 
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -64,9 +63,10 @@ public class EffNetworkActionBar extends Effect {
 		if (plugin == null)
 			return;
 
-		List<String> to = NetworkTargets.names(targets, event);
+		NetworkTargets.Targets to = NetworkTargets.of(targets, event);
 		for (Component line : text.getArray(event))
-			plugin.playerAction(PlayerAction.ACTION_BAR, to, NetworkTargets.text(NetworkText.toJson(line)));
+			plugin.playerAction(PlayerAction.ACTION_BAR, to.everyone(), to.names(),
+					NetworkTargets.text(NetworkText.toJson(line)));
 	}
 
 

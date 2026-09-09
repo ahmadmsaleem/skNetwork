@@ -41,14 +41,22 @@ class NetworkPlayerTest {
 	}
 
 	@Test
-	void asALiteralItTakesOnlyAPlausibleNameOrAUuid() {
-		assertEquals("Notch", NetworkPlayer.literal("Notch").name());
-		assertEquals(UUID.fromString(UUID_TEXT), NetworkPlayer.literal(UUID_TEXT).uuid());
+	void takesOnlyAPlausibleNameOrAUuid() {
+		assertEquals("Notch", NetworkPlayer.parse("Notch").name());
+		assertEquals(UUID.fromString(UUID_TEXT), NetworkPlayer.parse(UUID_TEXT).uuid());
+		assertEquals(".BedrockName", NetworkPlayer.parse(".BedrockName").name());
 
-		assertNull(NetworkPlayer.literal("totally bogus unquoted text here"));
-		assertNull(NetworkPlayer.literal("\"&aZZZ\" across the network"));
-		assertNull(NetworkPlayer.literal("a-name-far-too-long-to-be-real"));
-		assertNull(NetworkPlayer.literal(""));
+		assertNull(NetworkPlayer.parse("totally bogus unquoted text here"));
+		assertNull(NetworkPlayer.parse("\"&aZZZ\" across the network"));
+		assertNull(NetworkPlayer.parse("a-name-far-too-long-to-be-real"));
+		assertNull(NetworkPlayer.parse(""));
+	}
+
+	@Test
+	void judgesAConvertedStringTheSameWayAsATypedLiteral() {
+		assertNull(NetworkPlayer.parse("hello world"),
+				"a string that cannot be a name must not become a network player");
+		assertEquals(NetworkPlayer.parse("Notch"), NetworkPlayer.parse("Notch"));
 	}
 
 	@Test

@@ -18,6 +18,7 @@ import org.skriptlang.skript.registration.DefaultSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.spigot.SkNetworkSpigot;
 import sknetwork.spigot.elements.types.NetworkPlayer;
+import sknetwork.spigot.elements.types.NetworkPlayers;
 
 @Name("Network Server Of Player")
 @Description("""
@@ -66,7 +67,7 @@ public class ExprPlayerServer extends SimpleExpression<String> {
 
 		List<String> found = new ArrayList<>();
 		for (NetworkPlayer player : players.getArray(event)) {
-			String name = player.name();
+			String name = NetworkPlayers.name(player);
 			if (name == null)
 				continue;
 			String server = plugin.network().serverOf(name);

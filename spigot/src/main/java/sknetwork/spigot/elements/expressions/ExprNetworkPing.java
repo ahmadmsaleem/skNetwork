@@ -16,6 +16,7 @@ import org.skriptlang.skript.registration.DefaultSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.common.PingField;
 import sknetwork.common.PingSettings;
+import sknetwork.spigot.NetworkText;
 import sknetwork.spigot.SkNetworkSpigot;
 
 @Name("Network Ping Motd, Max Players And Player Count")
@@ -108,7 +109,7 @@ public class ExprNetworkPing extends SimpleExpression<Object> {
 					? Integer.toString(number.intValue())
 					: String.valueOf(value).trim();
 
-		return String.valueOf(value).replace('&', '\u00a7');
+		return NetworkText.fromAmpersand(String.valueOf(value));
 	}
 
 	@Override

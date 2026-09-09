@@ -479,8 +479,8 @@ public final class NetworkServer {
 		}
 	}
 
-	void playerAction(BackendConnection origin, PlayerAction action, List<String> targets,
-			byte[] body) {
+	void playerAction(BackendConnection origin, PlayerAction action, boolean everyone,
+			List<String> targets, byte[] body) {
 		if (!players) {
 			log.debug("ignored " + action + " from " + origin.name() + ": player features are off");
 			return;
@@ -491,18 +491,24 @@ public final class NetworkServer {
 			return;
 		}
 
-		if (targets.isEmpty()) {
-			Frame frame = delivery(action, List.of(), body);
+		if (everyone) {
+			Frame frame = delivery(action, true, List.of(), body);
 			for (BackendConnection connection : connections)
 				if (connection.isReady())
 					connection.send(frame);
 			return;
 		}
 
+		if (targets.isEmpty()) {
+			log.debug("dropped " + action + " from " + origin.name()
+					+ ": it named players but none of them resolved");
+			return;
+		}
+
 		state.route(targets).forEach((server, holding) -> {
 			for (BackendConnection connection : connections)
 				if (connection.isReady() && connection.name().equals(server))
-					connection.send(delivery(action, holding, body));
+					connection.send(delivery(action, false, holding, body));
 		});
 	}
 
@@ -523,9 +529,11 @@ public final class NetworkServer {
 			platform.connect(player, server);
 	}
 
-	private static Frame delivery(PlayerAction action, List<String> targets, byte[] body) {
+	private static Frame delivery(PlayerAction action, boolean everyone, List<String> targets,
+			byte[] body) {
 		PacketOut out = new PacketOut(Protocol.PLAYER_DELIVERY)
 				.varInt(action.id())
+				.bool(everyone)
 				.varInt(targets.size());
 		targets.forEach(out::string);
 		return out.nullableBytes(body).frame();
