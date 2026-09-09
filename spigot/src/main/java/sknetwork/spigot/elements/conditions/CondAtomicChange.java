@@ -62,9 +62,10 @@ public class CondAtomicChange extends Condition {
 	@Override
 	public boolean check(@NotNull Event event) {
 		AtomicResult result = LastAtomic.of(event);
-		boolean value = checksAnswer
-				? result != null && !result.answered()
-				: result != null && result.ok();
+		if (result == null)
+			return false;
+
+		boolean value = checksAnswer ? !result.answered() : result.ok();
 		return isNegated() != value;
 	}
 
