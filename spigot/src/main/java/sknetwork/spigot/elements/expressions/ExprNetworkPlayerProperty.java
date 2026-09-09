@@ -20,6 +20,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import sknetwork.common.PlayerProperties;
 import sknetwork.spigot.SkNetworkSpigot;
 import sknetwork.spigot.elements.types.NetworkPlayer;
+import sknetwork.spigot.elements.types.NetworkPlayers;
 
 @Name("Network Player Details")
 @Description("""
@@ -80,10 +81,11 @@ public class ExprNetworkPlayerProperty extends SimpleExpression<Object> {
 
 		List<Object> found = new ArrayList<>();
 		for (NetworkPlayer player : players.getArray(event)) {
-			if (player.name() == null)
+			String name = NetworkPlayers.name(player);
+			if (name == null)
 				continue;
 
-			PlayerProperties details = plugin.network().properties(player.name());
+			PlayerProperties details = plugin.network().properties(name);
 			if (details == null)
 				continue;
 

@@ -148,11 +148,12 @@ public final class NetworkModule implements AddonModule {
 						Fires when somebody joins the network. It fires on every server, not only the one they landed on.
 						That server also runs its own `on join`, so both fire there. Compare `the new network server` with `network server name` when only the server holding them should act.
 						Somebody moving between two servers is a switch, not a quit followed by a join.
+						This is a diff, not a record of arrivals. A proxy restart empties what the proxy knows, so the first report from each backend afterwards reads as a fresh arrival and this fires again for everyone who was already online. One backend reconnecting does the same for its own players. Rebuild state here rather than adding to a running total, or the total counts a restart as a join.
 						Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
 						""")
 				.examples("""
 						on network player join:
-							broadcast "%event-networkplayer% joined %the new network server%"
+							set {?online::%event-networkplayer%} to the new network server
 						""")
 				.since("1.0.0");
 
@@ -161,6 +162,7 @@ public final class NetworkModule implements AddonModule {
 				.description("""
 						Fires when somebody leaves the network altogether. It fires on every server.
 						Moving between two servers does not fire this. The proxy holds a quit back for a moment and turns it into a switch if they turn up on another server, so this only fires once they are really gone.
+						A server losing the proxy looks the same as its players leaving, so they quit once the grace is up and join again when it reconnects, without anybody having moved.
 						Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Sync-and-Events
 						""")
 				.examples("""

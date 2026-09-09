@@ -208,9 +208,11 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		return requestId;
 	}
 
-	/** @param targets empty for every player on the network */
-	public boolean playerAction(PlayerAction action, List<String> targets, byte[] body) {
-		return client != null && client.sendPlayerAction(action, targets, body);
+	public boolean playerAction(PlayerAction action, boolean everyone, List<String> targets,
+			byte[] body) {
+		if (!everyone && targets.isEmpty())
+			return false;
+		return client != null && client.sendPlayerAction(action, everyone, targets, body);
 	}
 
 	/** @param servers empty for every server on the network */
@@ -370,7 +372,13 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 	void onDisconnected() {
 		network.clear();
 		ping = PingSettings.NONE;
+		forgetReportedProperties();
 		fire(new NetworkDisconnectEvent());
+	}
+
+	private void forgetReportedProperties() {
+		if (isEnabled())
+			getServer().getScheduler().runTask(this, lastReported::clear);
 	}
 
 	private void fire(org.bukkit.event.Event event) {

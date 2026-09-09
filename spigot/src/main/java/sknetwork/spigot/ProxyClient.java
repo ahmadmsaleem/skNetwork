@@ -207,9 +207,11 @@ final class ProxyClient {
 				.frame());
 	}
 
-	boolean sendPlayerAction(PlayerAction action, List<String> targets, byte[] body) {
+	boolean sendPlayerAction(PlayerAction action, boolean everyone, List<String> targets,
+			byte[] body) {
 		PacketOut out = new PacketOut(Protocol.PLAYER_ACTION)
 				.varInt(action.id())
+				.bool(everyone)
 				.varInt(targets.size());
 		targets.forEach(out::string);
 		return send(out.nullableBytes(body).frame());

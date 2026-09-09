@@ -283,20 +283,21 @@ final class DeltaApplier extends BukkitRunnable {
 
 	private void deliver(PacketIn packet) throws IOException {
 		PlayerAction action = PlayerAction.byId((byte) packet.varInt());
+		boolean everyone = packet.bool();
 		int count = packet.varInt();
 		Set<String> named = new HashSet<>();
 		for (int i = 0; i < count; i++)
 			named.add(packet.string().toLowerCase(Locale.ROOT));
 		byte[] body = packet.nullableBytes();
-		if (body == null)
+		if (body == null || (!everyone && named.isEmpty()))
 			return;
 
-		if (named.isEmpty() && action == PlayerAction.MESSAGE)
+		if (everyone && action == PlayerAction.MESSAGE)
 			plugin.getServer().getConsoleSender()
 					.sendMessage(NetworkText.fromJson(new PacketIn(body).string()));
 
 		for (Player player : plugin.getServer().getOnlinePlayers()) {
-			if (!named.isEmpty() && !named.contains(player.getName().toLowerCase(Locale.ROOT)))
+			if (!everyone && !named.contains(player.getName().toLowerCase(Locale.ROOT)))
 				continue;
 			apply(player, action, new PacketIn(body));
 		}
