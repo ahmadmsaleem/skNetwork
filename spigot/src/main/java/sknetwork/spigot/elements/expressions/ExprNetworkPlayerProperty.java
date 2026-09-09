@@ -32,7 +32,8 @@ import sknetwork.spigot.elements.types.NetworkPlayers;
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")
 @Example("""
-		send "%event-networkplayer% is on %ping of network player event-networkplayer%ms"
+		on network server switch:
+			broadcast "%event-networkplayer% arrived with a ping of %ping of network player event-networkplayer%ms"
 		""")
 @Example("""
 		on network player join:

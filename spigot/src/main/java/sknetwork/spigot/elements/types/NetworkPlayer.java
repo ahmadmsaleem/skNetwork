@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 
 public final class NetworkPlayer {
 
-	private static final Pattern PLAUSIBLE_NAME = Pattern.compile("[A-Za-z0-9_.*]{1,16}");
+	private static final Pattern PLAUSIBLE_NAME = Pattern.compile("[A-Za-z0-9_.*]{1,32}");
 
 	private final String name;
 	private final UUID uuid;

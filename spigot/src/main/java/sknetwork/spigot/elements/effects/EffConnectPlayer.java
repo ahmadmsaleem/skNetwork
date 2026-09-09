@@ -27,7 +27,7 @@ import sknetwork.spigot.elements.types.NetworkPlayer;
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")
 @Example("""
-		connect network player "%player%" to "survival"
+		connect network player player to "survival"
 		""")
 @Since("0.2.0")
 public class EffConnectPlayer extends Effect {

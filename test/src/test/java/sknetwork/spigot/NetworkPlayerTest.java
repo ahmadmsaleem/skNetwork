@@ -46,6 +46,9 @@ class NetworkPlayerTest {
 		assertEquals(UUID.fromString(UUID_TEXT), NetworkPlayer.parse(UUID_TEXT).uuid());
 		assertEquals(".BedrockName", NetworkPlayer.parse(".BedrockName").name());
 
+		assertEquals("DefinitelyNotOnline", NetworkPlayer.parse("DefinitelyNotOnline").name(),
+				"a name over 16 characters is still a name, Geyser prefixes push past 16");
+
 		assertNull(NetworkPlayer.parse("totally bogus unquoted text here"));
 		assertNull(NetworkPlayer.parse("\"&aZZZ\" across the network"));
 		assertNull(NetworkPlayer.parse("a-name-far-too-long-to-be-real"));

@@ -28,7 +28,8 @@ import sknetwork.spigot.elements.types.NetworkPlayers;
 		Guide: https://github.com/ahmadmsaleem/skNetwork/wiki/Network-Players
 		""")
 @Example("""
-		send "%name of network player "Notch"%"
+		set {_who} to network player "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+		send "That UUID belongs to %name of network player {_who}%"
 		""")
 @Since("1.0.0")
 public class ExprNetworkPlayerDetail extends SimpleExpression<String> {
