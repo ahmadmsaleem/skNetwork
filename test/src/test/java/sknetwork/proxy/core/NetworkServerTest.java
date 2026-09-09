@@ -605,6 +605,21 @@ class NetworkServerTest {
 		assertEquals(40, connected("survival").sync().snapshot().size());
 	}
 
+	/**
+	 * Two values that straddle the chunk boundary. The chunk is measured before the
+	 * next value is appended, so one that lands on a nearly full chunk carries it
+	 * past the frame cap, and the backend cannot read the snapshot it is sent.
+	 */
+	@Test
+	void keepsASnapshotFrameUnderTheCapWhenOneValueStraddlesTheBoundary() throws IOException {
+		FakeBackend lobby = synced("lobby");
+		lobby.fireAndForget(MutationMode.SET, "blob::a", "string", new byte[4_500_000]);
+		lobby.fireAndForget(MutationMode.SET, "blob::b", "string", new byte[3_900_000]);
+		lobby.deltaAt(2);
+
+		assertEquals(2, connected("survival").sync().snapshot().size());
+	}
+
 	@Test
 	void spreadsALargeSnapshotOverSeveralFrames() throws IOException {
 		FakeBackend lobby = synced("lobby");
