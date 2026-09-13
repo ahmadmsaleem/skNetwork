@@ -1,7 +1,8 @@
 ![Cover](https://cdn.modrinth.com/data/iyNJtPOa/images/1ce92fbcf95485badaa205ee71422533f8affe85.jpeg)
 
 
-A Skript addon for sharing variables and scripts across every server on a BungeeCord or Velocity network.
+Cross-server variables for Skript: shared, global variables that stay in sync
+across every server on a BungeeCord or Velocity network, plus script sharing from the proxy. A Skungee alternative.
 
 ```applescript
 # on the lobby
@@ -67,18 +68,25 @@ Velocity 4.1.1.
 
 ```
 /sknet                      state, proxy, copy size, latency
-/sknet resync               pull the whole map again
-/sknet reconnect            drop the connection and resume
+/sknet resync               throw the copy away and pull everything again
+/sknet reconnect            drop the connection and continue where it stopped
 
 /sknetproxy                 proxy: state, backends, variable count
 /sknetproxy push            proxy: send scripts now
 /sknetproxy dump <pattern>  proxy: look up variables, '*' is a wildcard
+/sknetproxy log             proxy: storage size, compaction and flush times
+/sknetproxy compact         proxy: rewrite the log now
+/sknetproxy backup          proxy: timestamped copy of the log into backup/
 /sknetproxy reload          proxy: re-read config.yml, apply what can move
 ```
 
 The two halves use different names on purpose. A proxy handles any command it knows
 before the game server sees it, so keeping `/sknet` free means it always reaches the
 server you are standing on, where being an operator is already enough.
+
+`/sknet` also answers to `/sknetlocal` and `/sknl`, `/sknetproxy` to `/sknetp` and
+`/sknp`. Both need `sknetwork.admin`. Every option the two `config.yml` files take is
+on the **[Configuration wiki page](https://github.com/ahmadmsaleem/skNetwork/wiki/Configuration)**.
 
 ---
 ## Links
