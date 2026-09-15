@@ -20,7 +20,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                java: [25]
+                java: [21, 25]
         steps:
             - uses: actions/checkout@v6
 

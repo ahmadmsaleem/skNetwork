@@ -48,21 +48,21 @@ the full syntax reference and copyable example scripts.
 
 | | Works with | Recommended |
 |---|---|---|
-| Java | **25** | 25 |
+| Java | **21** or newer | 21 or 25 |
 | Minecraft | 1.21 to 26.2 | 26.1.2 |
 | Skript | 2.16.0+ | 2.16.2 |
 | Proxy | BungeeCord or Velocity | either |
 
-**Java 25 is required.** The jar will not load on Java 21 or older, whatever Minecraft
-version you run. Both rules apply together: a 1.21 server also has to be started with
-Java 25.
+**Java 21 is the floor.** The jar is built for Java 21, so it loads on 21 and on
+everything after it. Run whatever Java your Minecraft version asks for: 1.21 is happy
+on 21, and 26.x needs 25 regardless of skNetwork.
 
 Every game server and the proxy run the same jar. One that is behind is refused
 when it connects, with a message on both consoles saying which side to update.
 
 Works on offline servers. skNetwork never looks at player identity.
 Tested on Minecraft 1.21.11 and 26.1.2, Skript 2.16.2, BungeeCord 26.1 and
-Velocity 4.1.1.
+Velocity 4.1.1, on Java 21 and Java 25.
 
 ## Commands
 

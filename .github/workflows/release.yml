@@ -100,7 +100,7 @@ jobs:
 
                       | | Needs |
                       |---|---|
-                      | Java | **25**, on the proxy and on every backend |
+                      | Java | **21** or newer, on the proxy and on every backend |
                       | Minecraft | 1.21 to 26.2 |
                       | Skript | 2.16.0+ |
                       | Proxy | BungeeCord or Velocity |
