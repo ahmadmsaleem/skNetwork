@@ -41,10 +41,10 @@ final class ScriptSync {
 	/**
 	 * Set while a load is in flight. The load no longer blocks, so a second push can
 	 * arrive mid-flight; starting another one would have two loads racing over the same
-	 * folder. Dropping it is safe because appliedVersion is left alone, which is what
-	 * makes the proxy push again.
+	 * folder, so the newest one waits in queued until the load finishes.
 	 */
 	private boolean applying;
+	private Manifest queued;
 
 	ScriptSync(SkNetworkSpigot plugin, File scriptsFolder) {
 		this.plugin = plugin;
@@ -179,7 +179,8 @@ final class ScriptSync {
 
 		if (applying) {
 			plugin.getLogger().info("a push is still loading, so manifest " + manifest.version()
-					+ " is left for the next one");
+					+ " waits for it to finish");
+			queued = manifest;
 			return;
 		}
 
@@ -246,6 +247,11 @@ final class ScriptSync {
 					+ manifest.version() + (warningCount == 0 ? "" : ", " + warningCount + " warning(s)"));
 
 		send(manifest.version(), sent);
+
+		Manifest next = queued;
+		queued = null;
+		if (next != null)
+			onManifest(next);
 	}
 
 	/**
