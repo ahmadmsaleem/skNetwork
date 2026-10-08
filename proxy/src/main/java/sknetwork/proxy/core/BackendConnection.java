@@ -4,6 +4,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -162,11 +164,17 @@ final class BackendConnection {
 					+ "so update whichever one is behind.");
 			return false;
 		}
-		if (!server.token().equals(token)) {
+		if (!MessageDigest.isEqual(server.token().getBytes(StandardCharsets.UTF_8),
+				token.getBytes(StandardCharsets.UTF_8))) {
+			if (server.logins().failed(socket.getInetAddress(), System.currentTimeMillis()))
+				server.log().warn("refusing " + socket.getInetAddress().getHostAddress() + " for "
+						+ LoginLimiter.BLOCK_MS / 1000 + "s after " + LoginLimiter.MAX_FAILURES
+						+ " bad tokens");
 			reject("bad token - check 'proxy.token' in " + serverName + "'s config.yml "
 					+ "against 'token' in the proxy's");
 			return false;
 		}
+		server.logins().succeeded(socket.getInetAddress());
 
 		// only reported, never refused: a backend keying players the other way still
 		// works, it just quietly keeps its own copy of every player-keyed variable

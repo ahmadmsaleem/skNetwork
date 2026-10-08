@@ -1,5 +1,7 @@
 package sknetwork.proxy.core;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,18 @@ public record ProxySettings(String bind, int port, String token, boolean debug,
 	}
 
 	public boolean tokenIsExposedDefault() {
-		return "change-me".equals(token) && !"127.0.0.1".equals(bind);
+		return "change-me".equals(token) && !bindIsLoopback();
+	}
+
+	public boolean tokenIsWeak() {
+		return token.length() < 16 && !bindIsLoopback();
+	}
+
+	public boolean bindIsLoopback() {
+		try {
+			return InetAddress.getByName(bind).isLoopbackAddress();
+		} catch (UnknownHostException e) {
+			return false;
+		}
 	}
 }
