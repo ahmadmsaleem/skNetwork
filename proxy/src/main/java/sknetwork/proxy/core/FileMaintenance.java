@@ -3,18 +3,7 @@ package sknetwork.proxy.core;
 import java.io.File;
 import java.io.IOException;
 
-interface ChangeLog {
-
-
-	long open(VariableStore store) throws IOException;
-
-	boolean mayBeMissingKeys();
-
-	void append(long seq, String name, String type, byte[] value, String display);
-
-	void noPersist(NamePatterns patterns, VariableStore store, long seq);
-
-	void flush();
+interface FileMaintenance {
 
 	void maybeCompact(VariableStore store, long seq);
 
@@ -31,6 +20,4 @@ interface ChangeLog {
 	long compactThreshold(long liveKeys);
 
 	File backup() throws IOException;
-
-	void close();
 }
