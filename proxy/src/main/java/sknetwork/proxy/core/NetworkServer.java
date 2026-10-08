@@ -53,7 +53,8 @@ public final class NetworkServer {
 	private final LoginLimiter logins = new LoginLimiter();
 	private final ProxyLog log;
 	private final VariableStore store = new VariableStore();
-	private final ChangeLog changeLog;
+	private final Storage storage;
+	private final FileMaintenance maintenance;
 	private final boolean persists;
 	private final String logName;
 	private final long flushIntervalMs;
@@ -107,9 +108,8 @@ public final class NetworkServer {
 		this.replayCapacity = Math.max(replayCapacity, 0);
 		this.persists = logFile != null;
 		this.logName = logFile == null ? "none" : logFile.getName();
-		this.changeLog = logFile == null
-				? new NoopChangeLog()
-				: new CsvChangeLog(logFile, compactRatio, noPersist, log);
+		this.storage = Storage.of(logFile, compactRatio, noPersist, log);
+		this.maintenance = storage instanceof FileMaintenance file ? file : null;
 	}
 
 	public Log log() {
@@ -217,7 +217,7 @@ public final class NetworkServer {
 	}
 
 	void noPersist(NamePatterns patterns) {
-		changeLog.noPersist(patterns, store, sequence.get());
+		storage.noPersist(patterns, store, sequence.get());
 	}
 
 	void refreshState() {
@@ -274,8 +274,8 @@ public final class NetworkServer {
 	}
 
 	public void start() throws IOException {
-		sequence.set(changeLog.open(store));
-		rebuildMayBeShort = changeLog.mayBeMissingKeys();
+		sequence.set(storage.open(store));
+		rebuildMayBeShort = storage.mayBeMissingKeys();
 
 		ServerSocket socket = new ServerSocket();
 		socket.setReuseAddress(true);
@@ -297,7 +297,7 @@ public final class NetworkServer {
 			return thread;
 		});
 		long interval = Math.max(flushIntervalMs, 1);
-		flusher.scheduleWithFixedDelay(changeLog::flush, interval, interval, TimeUnit.MILLISECONDS);
+		flusher.scheduleWithFixedDelay(storage::flush, interval, interval, TimeUnit.MILLISECONDS);
 
 		long sweep = Math.max(NetworkState.SWITCH_GRACE_MS / 4, 1);
 		flusher.scheduleWithFixedDelay(this::sweepPlayerEvents, sweep, sweep, TimeUnit.MILLISECONDS);
@@ -320,7 +320,7 @@ public final class NetworkServer {
 		for (BackendConnection connection : new ArrayList<>(connections))
 			connection.close("proxy shutting down");
 
-		changeLog.close();
+		storage.close();
 	}
 
 	private void acceptLoop() {
@@ -602,7 +602,7 @@ public final class NetworkServer {
 		if (!outcome.delete())
 			store.set(name, outcome.type(), outcome.value(), outcome.display(), seq);
 
-		changeLog.append(seq, name, outcome.delete() ? null : outcome.type(),
+		storage.append(seq, name, outcome.delete() ? null : outcome.type(),
 				outcome.delete() ? null : outcome.value(),
 				outcome.delete() ? null : outcome.display());
 
@@ -624,7 +624,8 @@ public final class NetworkServer {
 		}
 
 		origin.reply(mutation, outcome, seq);
-		changeLog.maybeCompact(store, seq);
+		if (maintenance != null)
+			maintenance.maybeCompact(store, seq);
 
 		log.debug("seq " + seq + " " + mutation.mode() + " " + name + " from " + origin.name());
 	}
@@ -779,12 +780,12 @@ public final class NetworkServer {
 	}
 
 	public String logSummary() {
-		if (!persists)
+		if (maintenance == null)
 			return "off";
 
-		long lines = changeLog.dataLines();
+		long lines = maintenance.dataLines();
 		long keys = store.size();
-		return Style.bytes(changeLog.bytes()) + "  " + Style.number(lines) + " line(s) for "
+		return Style.bytes(maintenance.bytes()) + "  " + Style.number(lines) + " line(s) for "
 				+ Style.number(keys) + " key(s), "
 				+ String.format(Locale.ROOT, "%.1fx", lines / (double) Math.max(keys, 1));
 	}
@@ -795,25 +796,27 @@ public final class NetworkServer {
 
 	public LogStats logStats() {
 		long keys = store.size();
-		return new LogStats(persists, logName, changeLog.bytes(), changeLog.dataLines(), keys,
-				changeLog.compactThreshold(keys), changeLog.lastCompaction(), changeLog.lastFlush());
+		if (maintenance == null)
+			return new LogStats(persists, logName, 0, 0, keys, 0, 0, 0);
+		return new LogStats(persists, logName, maintenance.bytes(), maintenance.dataLines(), keys,
+				maintenance.compactThreshold(keys), maintenance.lastCompaction(), maintenance.lastFlush());
 	}
 
 	public record Compaction(long linesBefore, long bytesBefore, long linesAfter, long bytesAfter) {
 	}
 
 	public Compaction compactNow() {
-		if (!persists)
+		if (maintenance == null)
 			return null;
 
-		long linesBefore = changeLog.dataLines();
-		long bytesBefore = changeLog.bytes();
-		changeLog.compact(store, sequence.get());
-		return new Compaction(linesBefore, bytesBefore, changeLog.dataLines(), changeLog.bytes());
+		long linesBefore = maintenance.dataLines();
+		long bytesBefore = maintenance.bytes();
+		maintenance.compact(store, sequence.get());
+		return new Compaction(linesBefore, bytesBefore, maintenance.dataLines(), maintenance.bytes());
 	}
 
 	public File backupNow() throws IOException {
-		return persists ? changeLog.backup() : null;
+		return maintenance == null ? null : maintenance.backup();
 	}
 
 	public record Backend(String name, String address, String skriptVersion, long lastSeq,

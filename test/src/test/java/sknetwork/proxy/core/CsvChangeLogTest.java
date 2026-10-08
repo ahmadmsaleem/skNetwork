@@ -424,13 +424,13 @@ class CsvChangeLogTest {
 
 	@Test
 	void keepsNothingWhenThereIsNoLog() throws IOException {
-		NoopChangeLog changeLog = new NoopChangeLog();
+		Storage changeLog = Storage.of(null, 2.0, NamePatterns.none(), new RecordingLog());
 		VariableStore store = new VariableStore();
 
+		assertFalse(changeLog instanceof FileMaintenance);
 		assertEquals(0, changeLog.open(store));
 		changeLog.append(1, "coins", "long", Numbers.writeLong(1), "1");
 		changeLog.flush();
-		changeLog.maybeCompact(store, 1);
 		changeLog.close();
 
 		assertEquals(0, store.size());

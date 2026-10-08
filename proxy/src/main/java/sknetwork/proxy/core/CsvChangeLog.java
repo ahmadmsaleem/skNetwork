@@ -31,7 +31,7 @@ import sknetwork.common.VariableEntry;
  * The last line is a delete tombstone: empty type, empty value. The fifth field
  * is the display string /sknetproxy dump prints; a v1 log has four fields and none.
  */
-final class CsvChangeLog implements ChangeLog {
+final class CsvChangeLog implements Storage, FileMaintenance {
 
 
 	private static final String HEADER_PREFIX = "# skNetwork v";
