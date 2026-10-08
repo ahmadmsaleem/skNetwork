@@ -32,6 +32,15 @@ final class SknetCommand implements CommandExecutor {
 			Where this server found the proxy, and how long a round
 			trip takes. The ping runs every five seconds.""";
 
+	private static final String HELP_PROBLEM = """
+			Why this server is not connected, and the setting
+			that usually fixes it. The console has the full story.""";
+
+	private static final String HELP_SCRIPTS = """
+			Scripts pushed by the proxy, the manifest they came from,
+			and how many errors the last load reported. The proxy
+			console lists each error.""";
+
 	private static final String HELP_STORAGE = """
 			The prefix that makes a variable a network variable, and
 			the pattern Skript matches it against. The pattern lives
@@ -137,12 +146,28 @@ final class SknetCommand implements CommandExecutor {
 				SknetStyle.text("target", client == null ? "-" : client.describeTarget()),
 				SknetStyle.text("ms", Style.number(latency)));
 
+		String error = client == null ? null : client.lastError();
+		if (state != SyncState.READY && error != null) {
+			row(sender, "Problem", HELP_PROBLEM, "<red><error>", SknetStyle.text("error", error));
+			sender.sendMessage(SknetStyle.note("<hint>", SknetStyle.text("hint", hint(error))));
+		}
+
 		if (SkNetworkStorage.isConfigured())
 			row(sender, "Storage", HELP_STORAGE, "<white><prefix><dark_gray>  routing <pattern>",
 					SknetStyle.text("prefix", plugin.prefix()),
 					SknetStyle.text("pattern", SkNetworkStorage.pattern()));
 		else
 			row(sender, "Storage", HELP_STORAGE, "<red>NOT CONFIGURED");
+
+		ScriptSync scripts = plugin.scripts();
+		if (scripts != null && scripts.fileCount() > 0)
+			row(sender, "Scripts", HELP_SCRIPTS,
+					"<white><count> <gray>pushed"
+							+ (scripts.appliedVersion() > 0 ? "<dark_gray>  manifest <version>" : "")
+							+ (scripts.lastErrors() == 0 ? "" : "<dark_gray>  -  <red><errors> <gray>error(s)"),
+					SknetStyle.text("count", Style.number(scripts.fileCount())),
+					SknetStyle.text("version", Style.number(scripts.appliedVersion())),
+					SknetStyle.text("errors", Style.number(scripts.lastErrors())));
 
 		row(sender, "Mirror", HELP_MIRROR, "<white><count> <gray>variables<dark_gray>  seq <seq>",
 				SknetStyle.text("count", Style.number(applier == null ? 0 : applier.mirroredCount())),
@@ -181,6 +206,25 @@ final class SknetCommand implements CommandExecutor {
 	private void usage(CommandSender sender) {
 		sender.sendMessage(SknetStyle.hint("/sknet resync", "throw the copy away and pull everything"));
 		sender.sendMessage(SknetStyle.hint("/sknet reconnect", "drop the connection and resume"));
+	}
+
+	private static String hint(String error) {
+		String e = error.toLowerCase(Locale.ROOT);
+		if (e.contains("bad token"))
+			return "proxy.token here must match 'token' on the proxy";
+		if (e.contains("protocol mismatch"))
+			return "use the same skNetwork jar on the proxy and every server";
+		if (e.contains("unknown host"))
+			return "proxy.host is not a name this machine can look up";
+		if (e.contains("refused"))
+			return "nothing listens there: is the proxy running, and do proxy.host and proxy.port point at its bind and port?";
+		if (e.contains("timed out"))
+			return "no answer: proxy.host is wrong, or a firewall blocks proxy.port";
+		if (e.contains("eof"))
+			return "the proxy hung up at once: proxy.port may be the game port, or the proxy is refusing this address after too many bad tokens";
+		if (e.contains("pings"))
+			return "the connection went quiet: check the network between this server and the proxy";
+		return "the console has the details";
 	}
 
 	private static String colour(SyncState state) {

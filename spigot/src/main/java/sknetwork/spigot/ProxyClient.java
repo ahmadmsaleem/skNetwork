@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
@@ -418,6 +419,8 @@ final class ProxyClient {
 
 	/** A socket closed under us throws with no message, which used to read as "null". */
 	private static String describe(IOException e) {
+		if (e instanceof UnknownHostException)
+			return "unknown host " + e.getMessage();
 		String message = e.getMessage();
 		return message == null || message.isBlank() ? e.getClass().getSimpleName() : message;
 	}

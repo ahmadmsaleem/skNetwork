@@ -46,6 +46,7 @@ final class ScriptSync {
 	private boolean applying;
 	private Manifest queued;
 	private boolean diskLoaded = true;
+	private int lastErrors;
 
 	ScriptSync(SkNetworkSpigot plugin, File scriptsFolder) {
 		this.plugin = plugin;
@@ -85,6 +86,10 @@ final class ScriptSync {
 
 	long appliedVersion() {
 		return appliedVersion;
+	}
+
+	int lastErrors() {
+		return lastErrors;
 	}
 
 	int fileCount() {
@@ -242,6 +247,7 @@ final class ScriptSync {
 		SkriptScripts.LoadReport sent = new SkriptScripts.LoadReport(report.loaded(), problems,
 				report.failed() || failure != null);
 		int errorCount = sent.errors().size();
+		lastErrors = errorCount;
 		int warningCount = sent.warnings().size();
 
 		if (errorCount > 0)
