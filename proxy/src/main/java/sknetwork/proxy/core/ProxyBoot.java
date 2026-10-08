@@ -11,6 +11,12 @@ public final class ProxyBoot {
 		if (settings.tokenIsExposedDefault())
 			log.warn("bound to " + settings.bind() + " with the default token. Anyone who can reach "
 					+ "port " + settings.port() + " can read and write every network variable you have.");
+		else if (settings.tokenIsWeak())
+			log.warn("the token is only " + settings.token().length() + " characters long. Use at least "
+					+ "16 random characters, the same on the proxy and every backend.");
+		if (!settings.bindIsLoopback())
+			log.warn("bound to " + settings.bind() + ": the token and every network variable travel "
+					+ "unencrypted, so only expose port " + settings.port() + " on a network you trust.");
 
 		File logFile = settings.persists() ? new File(dataFolder, settings.logName()) : null;
 

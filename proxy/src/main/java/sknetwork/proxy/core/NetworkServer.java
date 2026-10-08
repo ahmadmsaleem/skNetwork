@@ -50,6 +50,7 @@ public final class NetworkServer {
 	private final String bindHost;
 	private final int port;
 	private final String token;
+	private final LoginLimiter logins = new LoginLimiter();
 	private final ProxyLog log;
 	private final VariableStore store = new VariableStore();
 	private final ChangeLog changeLog;
@@ -252,6 +253,10 @@ public final class NetworkServer {
 		return scripts;
 	}
 
+	LoginLimiter logins() {
+		return logins;
+	}
+
 	public String token() {
 		return token;
 	}
@@ -322,6 +327,10 @@ public final class NetworkServer {
 		while (running) {
 			try {
 				Socket client = serverSocket.accept();
+				if (logins.blocked(client.getInetAddress(), System.currentTimeMillis())) {
+					client.close();
+					continue;
+				}
 				client.setTcpNoDelay(true);
 				new BackendConnection(this, client).start();
 			} catch (IOException e) {
