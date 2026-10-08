@@ -32,7 +32,11 @@ final class SkriptScripts {
 	record LoadProblem(String path, int line, String message, boolean severe) {
 	}
 
-	record LoadReport(int loaded, List<LoadProblem> problems) {
+	record LoadReport(int loaded, List<LoadProblem> problems, boolean failed) {
+
+		static LoadReport failed(File root, Object error) {
+			return new LoadReport(0, List.of(new LoadProblem(root.getName(), 0, String.valueOf(error), true)), true);
+		}
 
 		List<LoadProblem> errors() {
 			return problems.stream().filter(LoadProblem::severe).toList();
@@ -59,13 +63,12 @@ final class SkriptScripts {
 			try {
 				unloadUnder(root);
 			} catch (RuntimeException e) {
-				whenDone.accept(new LoadReport(0,
-						List.of(new LoadProblem(root.getName(), 0, String.valueOf(e), true))));
+				whenDone.accept(LoadReport.failed(root, e));
 				return;
 			}
 
 			if (!root.isDirectory()) {
-				whenDone.accept(new LoadReport(0, List.of()));
+				whenDone.accept(new LoadReport(0, List.of(), false));
 				return;
 			}
 
@@ -75,16 +78,15 @@ final class SkriptScripts {
 					LoadReport report;
 					try {
 						report = error != null
-								? new LoadReport(0, List.of(new LoadProblem(root.getName(), 0, String.valueOf(error), true)))
-								: new LoadReport(countLoadedUnder(root), collect(handler, root));
+								? LoadReport.failed(root, error)
+								: new LoadReport(countLoadedUnder(root), collect(handler, root), false);
 					} catch (RuntimeException e) {
-						report = new LoadReport(0, List.of(new LoadProblem(root.getName(), 0, String.valueOf(e), true)));
+						report = LoadReport.failed(root, e);
 					}
 					whenDone.accept(report);
 				}, onMainThread);
 			} catch (RuntimeException e) {
-				whenDone.accept(new LoadReport(0,
-						List.of(new LoadProblem(root.getName(), 0, String.valueOf(e), true))));
+				whenDone.accept(LoadReport.failed(root, e));
 			}
 		});
 	}

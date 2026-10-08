@@ -45,6 +45,7 @@ final class ScriptSync {
 	 */
 	private boolean applying;
 	private Manifest queued;
+	private boolean diskLoaded = true;
 
 	ScriptSync(SkNetworkSpigot plugin, File scriptsFolder) {
 		this.plugin = plugin;
@@ -108,7 +109,7 @@ final class ScriptSync {
 				wanted.add(path);
 		});
 
-		if (wanted.isEmpty() && have.keySet().stream().allMatch(manifest.hashesByPath()::containsKey)) {
+		if (diskLoaded && wanted.isEmpty() && have.keySet().stream().allMatch(manifest.hashesByPath()::containsKey)) {
 			// Disk already holds exactly this manifest, and Skript loads what is on disk by
 			// itself. Reloading anyway loads every script a second time, and with async
 			// loading both copies stay registered and every trigger runs twice. This is the
@@ -191,10 +192,12 @@ final class ScriptSync {
 		} catch (IOException e) {
 			plugin.getLogger().severe("could not stage the pushed scripts: " + e.getMessage());
 			delete(staging);
+			send(manifest.version(), SkriptScripts.LoadReport.failed(root, "could not stage manifest "
+					+ manifest.version() + ": " + e.getMessage()));
 			return;
 		}
 
-		SkriptScripts.unloadUnder(root);
+		diskLoaded = false;
 
 		String failure = null;
 		try {
@@ -225,17 +228,19 @@ final class ScriptSync {
 		applying = false;
 
 		List<SkriptScripts.LoadProblem> problems = new ArrayList<>(report.problems());
-		if (failure == null) {
-			appliedVersion = Math.max(appliedVersion, manifest.version());
-		} else {
+		if (failure != null) {
 			// leaving the version alone is what makes the next push retry. recording it
 			// would strand this server on the old scripts with the proxy reporting success
 			problems.add(new SkriptScripts.LoadProblem("", 0,
 					"could not apply manifest " + manifest.version() + ": " + failure, true));
 			plugin.getLogger().severe("could not apply the pushed scripts: " + failure);
+		} else if (!report.failed()) {
+			appliedVersion = Math.max(appliedVersion, manifest.version());
+			diskLoaded = true;
 		}
 
-		SkriptScripts.LoadReport sent = new SkriptScripts.LoadReport(report.loaded(), problems);
+		SkriptScripts.LoadReport sent = new SkriptScripts.LoadReport(report.loaded(), problems,
+				report.failed() || failure != null);
 		int errorCount = sent.errors().size();
 		int warningCount = sent.warnings().size();
 
