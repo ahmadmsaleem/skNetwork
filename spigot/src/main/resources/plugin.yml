@@ -6,7 +6,7 @@ author: eult
 description: Shares your Skript variables and scripts with the rest of the network.
 
 # Not softdepend. Without Skript this half has nothing to hook into, and the
-# storage has to be registered in onLoad, before Skript enables.
+# storage has to be registered before Skript loads its variables.
 depend: [Skript]
 
 commands:
