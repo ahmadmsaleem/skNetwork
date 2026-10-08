@@ -1,10 +1,14 @@
 package sknetwork.spigot;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import ch.njol.skript.ScriptLoader;
@@ -14,6 +18,8 @@ import ch.njol.skript.log.RetainingLogHandler;
 import org.skriptlang.skript.lang.script.Script;
 
 final class SkriptScripts {
+
+	private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger("skNetwork");
 
 
 	/**
@@ -37,17 +43,96 @@ final class SkriptScripts {
 		}
 	}
 
-	static LoadReport reload(File root) {
-		unloadUnder(root);
+	/**
+	 * Loads everything under {@code root} and hands the report to {@code whenDone} on
+	 * {@code onMainThread}.
+	 *
+	 * Never joins the future. With 'script loader thread size' at 1 or more Skript parses
+	 * off-thread and calls back to the main thread to register what it finds, so waiting
+	 * here deadlocks the server outright.
+	 *
+	 * The handler is passed in unopened: loadScripts owns it for the load and closes it
+	 * after, and what it retained is readable once the future completes.
+	 */
+	static void reload(File root, File barrier, Executor onMainThread, Consumer<LoadReport> whenDone) {
+		afterQueuedLoads(barrier, onMainThread, () -> {
+			try {
+				unloadUnder(root);
+			} catch (RuntimeException e) {
+				whenDone.accept(new LoadReport(0,
+						List.of(new LoadProblem(root.getName(), 0, String.valueOf(e), true))));
+				return;
+			}
 
-		if (!root.isDirectory())
-			return new LoadReport(0, List.of());
+			if (!root.isDirectory()) {
+				whenDone.accept(new LoadReport(0, List.of()));
+				return;
+			}
 
-		try (RetainingLogHandler handler = new RetainingLogHandler().start()) {
-			ScriptLoader.loadScripts(root, handler).join();
-			return new LoadReport(countLoadedUnder(root), collect(handler, root));
+			RetainingLogHandler handler = new RetainingLogHandler();
+			try {
+				ScriptLoader.loadScripts(root, handler).whenCompleteAsync((info, error) -> {
+					LoadReport report;
+					try {
+						report = error != null
+								? new LoadReport(0, List.of(new LoadProblem(root.getName(), 0, String.valueOf(error), true)))
+								: new LoadReport(countLoadedUnder(root), collect(handler, root));
+					} catch (RuntimeException e) {
+						report = new LoadReport(0, List.of(new LoadProblem(root.getName(), 0, String.valueOf(e), true)));
+					}
+					whenDone.accept(report);
+				}, onMainThread);
+			} catch (RuntimeException e) {
+				whenDone.accept(new LoadReport(0,
+						List.of(new LoadProblem(root.getName(), 0, String.valueOf(e), true))));
+			}
+		});
+	}
+
+	/**
+	 * Runs {@code then} on the main thread once Skript's loader has finished everything
+	 * queued ahead of us.
+	 *
+	 * Skript loads this folder itself at startup. Unloading before that load has registered
+	 * finds nothing, and the reload that follows leaves both copies registered: every trigger
+	 * runs twice, and unloading later cannot reach the orphan. Queueing a throwaway script
+	 * first, and unloading only once it is through, puts the unload behind Skript's own load.
+	 * With async loading off the queue is not used and this adds a tick at most.
+	 */
+	private static void afterQueuedLoads(File barrier, Executor onMainThread, Runnable then) {
+		try {
+			Files.writeString(barrier.toPath(), "options:\n\tsknetwork_load_barrier: true\n");
+		} catch (IOException e) {
+			then.run();
+			return;
+		}
+
+		try {
+			ScriptLoader.loadScripts(Set.of(barrier), new RetainingLogHandler())
+					.whenCompleteAsync((info, error) -> {
+						// a callback that throws is swallowed by the future, and the load it was
+						// guarding would then never happen
+						try {
+							if (error != null)
+								LOG.warning("load barrier failed, loading without it: " + error);
+							// getScripts(File) only takes a directory, so match the file ourselves
+							Set<Script> loaded = new HashSet<>();
+							for (Script script : ScriptLoader.getLoadedScripts()) {
+								File file = script.getConfig().getFile();
+								if (file != null && sameFile(file, barrier))
+									loaded.add(script);
+							}
+							if (!loaded.isEmpty())
+								ScriptLoader.unloadScripts(loaded);
+						} catch (RuntimeException e) {
+							LOG.log(Level.WARNING, "could not clear the load barrier", e);
+						} finally {
+							then.run();
+						}
+					}, onMainThread);
 		} catch (RuntimeException e) {
-			return new LoadReport(0, List.of(new LoadProblem(root.getName(), 0, String.valueOf(e), true)));
+			LOG.log(Level.WARNING, "could not queue the load barrier, loading without it", e);
+			then.run();
 		}
 	}
 
@@ -103,6 +188,14 @@ final class SkriptScripts {
 	private static int lineOf(LogEntry entry) {
 		Node node = entry.node;
 		return node == null ? 0 : Math.max(node.getLine(), 0);
+	}
+
+	private static boolean sameFile(File a, File b) {
+		try {
+			return a.getCanonicalFile().equals(b.getCanonicalFile());
+		} catch (IOException e) {
+			return a.getAbsoluteFile().equals(b.getAbsoluteFile());
+		}
 	}
 
 	private static boolean isUnder(File file, File root) {

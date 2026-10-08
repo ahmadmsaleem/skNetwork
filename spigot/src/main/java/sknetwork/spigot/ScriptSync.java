@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.stream.Stream;
 
 import sknetwork.common.Manifest;
@@ -36,6 +37,14 @@ final class ScriptSync {
 	private Map<String, byte[]> arrived;
 	private int expected;
 	private long appliedVersion = Manifest.NO_VERSION;
+
+	/**
+	 * Set while a load is in flight. The load no longer blocks, so a second push can
+	 * arrive mid-flight; starting another one would have two loads racing over the same
+	 * folder, so the newest one waits in queued until the load finishes.
+	 */
+	private boolean applying;
+	private Manifest queued;
 
 	ScriptSync(SkNetworkSpigot plugin, File scriptsFolder) {
 		this.plugin = plugin;
@@ -99,6 +108,17 @@ final class ScriptSync {
 				wanted.add(path);
 		});
 
+		if (wanted.isEmpty() && have.keySet().stream().allMatch(manifest.hashesByPath()::containsKey)) {
+			// Disk already holds exactly this manifest, and Skript loads what is on disk by
+			// itself. Reloading anyway loads every script a second time, and with async
+			// loading both copies stay registered and every trigger runs twice. This is the
+			// normal case after a restart.
+			appliedVersion = Math.max(appliedVersion, manifest.version());
+			plugin.getLogger().info("manifest " + manifest.version() + " is already on disk, "
+					+ "nothing to reload");
+			return;
+		}
+
 		pending = manifest;
 		arrived = new LinkedHashMap<>();
 		expected = wanted.size();
@@ -157,6 +177,13 @@ final class ScriptSync {
 		if (manifest == null)
 			return;
 
+		if (applying) {
+			plugin.getLogger().info("a push is still loading, so manifest " + manifest.version()
+					+ " waits for it to finish");
+			queued = manifest;
+			return;
+		}
+
 		try {
 			delete(staging);
 			for (Map.Entry<String, byte[]> entry : files.entrySet())
@@ -186,11 +213,20 @@ final class ScriptSync {
 		}
 
 		writeNotice();
-		SkriptScripts.LoadReport report = SkriptScripts.reload(root);
+
+		String staged = failure;
+		applying = true;
+		SkriptScripts.reload(root, new File(plugin.getDataFolder(), "load-barrier.sk"), mainThread(),
+				report -> finish(manifest, staged, report));
+	}
+
+	/** Runs once the load has finished, back on the main thread. */
+	private void finish(Manifest manifest, String failure, SkriptScripts.LoadReport report) {
+		applying = false;
 
 		List<SkriptScripts.LoadProblem> problems = new ArrayList<>(report.problems());
 		if (failure == null) {
-			appliedVersion = manifest.version();
+			appliedVersion = Math.max(appliedVersion, manifest.version());
 		} else {
 			// leaving the version alone is what makes the next push retry. recording it
 			// would strand this server on the old scripts with the proxy reporting success
@@ -211,6 +247,23 @@ final class ScriptSync {
 					+ manifest.version() + (warningCount == 0 ? "" : ", " + warningCount + " warning(s)"));
 
 		send(manifest.version(), sent);
+
+		Manifest next = queued;
+		queued = null;
+		if (next != null)
+			onManifest(next);
+	}
+
+	/**
+	 * Hops back to the main thread. Skript may complete the load on its own loader
+	 * thread, and counting loaded scripts and reading the retained log both touch
+	 * Skript state that belongs to the server thread.
+	 */
+	private Executor mainThread() {
+		return task -> {
+			if (plugin.isEnabled())
+				plugin.getServer().getScheduler().runTask(plugin, task);
+		};
 	}
 
 	private void send(long version, SkriptScripts.LoadReport report) {
