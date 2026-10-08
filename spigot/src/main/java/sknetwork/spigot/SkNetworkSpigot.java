@@ -75,7 +75,9 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 		// has to be before Skript parses config.sk, which it does in its own onEnable
 		if (config.forceSkriptConfig())
 			configureSkript(false);
+	}
 
+	private void registerStorage() {
 		if (config.prefix().indexOf('#') >= 0) {
 			// registering anyway would make us Skript's catch-all, and save() would then
 			// drop every variable without our prefix instead of letting variables.csv have it
@@ -92,6 +94,7 @@ public final class SkNetworkSpigot extends JavaPlugin implements NetworkAccess {
 
 	@Override
 	public void onEnable() {
+		registerStorage();
 		if (Skript.getVersion().isSmallerThan(OLDEST_SKRIPT)) {
 			getLogger().severe(SkNetwork.NAME + " " + getPluginMeta().getVersion() + " needs Skript "
 					+ OLDEST_SKRIPT + " or newer, and this server runs Skript " + Skript.getVersion()
