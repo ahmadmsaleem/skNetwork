@@ -44,7 +44,7 @@ public final class NetworkPlayerType {
 
 					@Override
 					public boolean canParse(@NotNull ParseContext context) {
-						return true;
+						return context == ParseContext.COMMAND || context == ParseContext.PARSE;
 					}
 
 					@Override
